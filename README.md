@@ -1,38 +1,59 @@
 # Inventory Monorepo
 
-This workspace now uses a monorepo-oriented layout with a root workspace definition and shared tooling.
+This repository uses a monorepo layout for development consistency, while deployment remains microservice based.
 
-## What changed
+## Architecture model
 
-- Added a root `package.json` with npm workspaces.
-- Added root scripts to run `build`, `lint`, `test`, and `format` across all workspace packages.
-- Added a shared `tsconfig.base.json` for TypeScript services.
-- Added a root `.gitignore` for common generated files.
+- Monorepo for source control, dependency orchestration, and shared developer workflows.
+- Independent microservice deployment for build, containerization, and runtime.
 
-## Current workspace packages
+Each service is deployed separately and owns its own runtime configuration.
 
-Any folder matched by the workspace patterns and containing a `package.json` is included automatically.
+## Root responsibilities
 
-Today, `auth-service` is the active package with full Node/Nest setup.
+The root is used for workspace level orchestration:
 
-## Run commands from root
+- npm workspaces definition
+- shared scripts for build, lint, test, and formatting
+- shared TypeScript baseline in tsconfig.base.json
+- global ignore and repo level documentation
 
-```bash
-npm install
-npm run build
-npm run test
-npm run start:auth:dev
-```
+The root is not a deployable service.
 
-## Migration path for each service
+## Service responsibilities
 
-For each service folder you want managed by this monorepo:
+Each deployable service should contain its own:
 
-1. Add a `package.json` in that service folder.
-2. Add service-specific scripts (`build`, `lint`, `test`, etc.).
-3. If TypeScript-based, set service `tsconfig.json` to extend `../tsconfig.base.json`.
-4. Run root-level commands to execute scripts across all services.
+- package.json
+- Dockerfile
+- environment templates and service config
+- service specific build and test scripts
 
-## Git note
+This keeps deployment boundaries clean and supports independent releases.
 
-Several service folders currently contain their own `.git` directories. This setup can coexist while migrating, but a true single-repo Git model usually requires consolidating those repositories into one root repository when you are ready.
+## Running from root
+
+Use root commands for developer productivity across services:
+
+- npm install
+- npm run build
+- npm run test
+- npm run start:auth:dev
+
+## Deploying services
+
+Deploy per service, not from root.
+
+Typical flow per service:
+
+1. Build and test the service.
+2. Build the service Docker image using that service folder context.
+3. Push image and deploy through the service specific pipeline.
+
+## Onboarding a new service
+
+1. Create the service folder.
+2. Add package.json and service scripts.
+3. Add Dockerfile and runtime configuration.
+4. If TypeScript based, extend ../tsconfig.base.json.
+5. Add CI path filters so only changed services deploy.
