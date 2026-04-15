@@ -1,4 +1,4 @@
-# Inventory Waala Monorepo
+# Inventory Monorepo
 
 This workspace now uses a monorepo-oriented layout with a root workspace definition and shared tooling.
 
