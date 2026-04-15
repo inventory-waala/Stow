@@ -1,6 +1,9 @@
 # Root workspace dependencies
 node_modules/
 
+# Monorepo packages
+**/node_modules/
+
 # Build artifacts
 **/dist/
 **/coverage/
