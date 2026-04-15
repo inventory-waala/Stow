@@ -1,0 +1,28 @@
+{
+  "name": "inventory-monorepo",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Monorepo workspace for inventory-waala services",
+  "workspaces": [
+    "*-service",
+    "api-gateway",
+    "event-processor",
+    "vault-service",
+    "vendor-service"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "build:all": "npm run build --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "format": "npm run format --workspaces --if-present",
+    "start:auth": "npm --workspace auth-service run start",
+    "start:auth:dev": "npm --workspace auth-service run start:dev",
+    "build:auth": "npm --workspace auth-service run build",
+    "test:auth": "npm --workspace auth-service run test",
+    "deploy:auth": "npm --workspace auth-service run start:prod"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

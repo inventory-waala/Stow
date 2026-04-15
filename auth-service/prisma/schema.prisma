@@ -1,0 +1,130 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserStatus {
+  ACTIVE
+  PENDING_VERIFICATION
+  SUSPENDED
+}
+
+model User {
+  id                String          @id @default(cuid())
+  name              String?
+  email             String          @unique
+  password          String
+  status            UserStatus      @default(ACTIVE)
+  is_email_verified Boolean         @default(false)
+  created_at        DateTime        @default(now())
+  updated_at        DateTime        @updatedAt
+  authenticators    Authenticator[]
+
+  @@index([id])
+}
+
+model Authenticator {
+  id                     String   @id @default(cuid())
+  credential_id          String   @unique
+  credential_public_key  Bytes
+  counter                BigInt
+  credential_device_type String
+  credential_backed_up   Boolean
+  transports             String?
+  user_id                String
+  user                   User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  created_at             DateTime @default(now())
+
+  @@index([user_id])
+}
+
+model Roles {
+  id          String   @id @default(cuid())
+  tenant_id   String
+  name        String
+  description String?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  @@unique([name, tenant_id])
+  @@index([tenant_id])
+}
+
+model Permissions {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+}
+
+model RolePermission {
+  role_id       String
+  permission_id String
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  @@id([role_id, permission_id])
+}
+
+model UserRole {
+  user_id    String
+  role_id    String
+  tenant_id  String
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@id([user_id, role_id, tenant_id])
+}
+
+model Tenant {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+}
+
+model RefreshToken {
+  id         String   @id @default(cuid())
+  token      String   @unique
+  user_id    String
+  expires_at DateTime
+  revoked    Boolean  @default(false)
+  created_at DateTime @default(now())
+}
+
+model EmailVerificationToken {
+  id         String   @id @default(cuid())
+  token      String   @unique
+  user_id    String
+  expires_at DateTime
+  created_at DateTime @default(now())
+}
+
+model PasswordResetToken {
+  id         String   @id @default(cuid())
+  token      String   @unique
+  user_id    String
+  expires_at DateTime
+  created_at DateTime @default(now())
+}
+
+model ApiKey {
+  id         String   @id @default(cuid())
+  tenant_id  String
+  key        String   @unique
+  user_id    String
+  expires_at DateTime
+  created_at DateTime @default(now())
+}

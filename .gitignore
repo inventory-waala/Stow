@@ -1,0 +1,14 @@
+# Root workspace dependencies
+node_modules/
+
+# Build artifacts
+**/dist/
+**/coverage/
+
+# Environment and secrets
+**/.env
+**/.env.*
+
+# Logs and temp files
+**/*.log
+**/.DS_Store
