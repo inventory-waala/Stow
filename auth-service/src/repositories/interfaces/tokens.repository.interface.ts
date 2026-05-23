@@ -18,7 +18,9 @@ export interface ITokensRepository {
   createPasswordResetToken(
     data: CreatePasswordResetTokenDto,
   ): Promise<PasswordResetTokenProfileDto>;
-  findPasswordResetToken(token: string): Promise<PasswordResetTokenProfileDto | null>;
+  findPasswordResetToken(
+    token: string,
+  ): Promise<PasswordResetTokenProfileDto | null>;
   deletePasswordResetToken(tokenId: string): Promise<void>;
   deleteUserPasswordResetTokens(userId: string): Promise<void>;
 }

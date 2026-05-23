@@ -60,7 +60,9 @@ export class AuthService implements IAuthService {
     // Resolve tenant: use provided tenant_id OR fall back to user's first tenant
     let tenantId = loginData.tenant_id;
     if (!tenantId) {
-      const firstRole = await this.usersRepository.findFirstUserRole(userData.id);
+      const firstRole = await this.usersRepository.findFirstUserRole(
+        userData.id,
+      );
       tenantId = firstRole?.tenant_id ?? undefined;
     }
 

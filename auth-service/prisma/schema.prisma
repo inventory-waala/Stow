@@ -16,6 +16,7 @@ datasource db {
 enum UserStatus {
   ACTIVE
   PENDING_VERIFICATION
+  INACTIVE
   SUSPENDED
 }
 
@@ -24,26 +25,26 @@ model User {
   name              String?
   email             String          @unique
   password          String
-  status            UserStatus      @default(ACTIVE)
-  is_email_verified Boolean         @default(false)
-  created_at        DateTime        @default(now())
-  updated_at        DateTime        @updatedAt
+  status            UserStatus @default(ACTIVE)
+  is_email_verified Boolean    @default(false)
+  created_at        DateTime   @default(now())
+  updated_at        DateTime   @updatedAt
   authenticators    Authenticator[]
 
   @@index([id])
 }
 
 model Authenticator {
-  id                     String   @id @default(cuid())
-  credential_id          String   @unique
-  credential_public_key  Bytes
-  counter                BigInt
+  id                   String   @id @default(cuid())
+  credential_id        String   @unique
+  credential_public_key Bytes
+  counter              BigInt
   credential_device_type String
-  credential_backed_up   Boolean
-  transports             String?
-  user_id                String
-  user                   User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  created_at             DateTime @default(now())
+  credential_backed_up Boolean
+  transports           String?
+  user_id              String
+  user                 User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  created_at           DateTime @default(now())
 
   @@index([user_id])
 }

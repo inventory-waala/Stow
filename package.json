@@ -1,28 +1,32 @@
 {
   "name": "inventory-monorepo",
-  "private": true,
   "version": "1.0.0",
-  "description": "Monorepo workspace for inventory-waala services",
+  "private": true,
+  "description": "Inventory management monorepo with Nx orchestration",
   "workspaces": [
-    "*-service",
+    "analytics-service",
     "api-gateway",
+    "audit-service",
+    "auth-service",
+    "customer-service",
     "event-processor",
+    "inventory-service",
+    "notification-service",
+    "organization-service",
+    "product-service",
+    "subscription-service",
+    "transaction-service",
     "vault-service",
     "vendor-service"
   ],
   "scripts": {
-    "build": "npm run build --workspaces --if-present",
-    "build:all": "npm run build --workspaces --if-present",
-    "lint": "npm run lint --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present",
-    "format": "npm run format --workspaces --if-present",
-    "start:auth": "npm --workspace auth-service run start",
-    "start:auth:dev": "npm --workspace auth-service run start:dev",
-    "build:auth": "npm --workspace auth-service run build",
-    "test:auth": "npm --workspace auth-service run test",
-    "deploy:auth": "npm --workspace auth-service run start:prod"
+    "build": "nx run-many -t build",
+    "lint": "nx run-many -t lint",
+    "test": "nx run-many -t test",
+    "format": "nx format:write",
+    "start:auth:dev": "nx run auth-service:start:dev"
   },
-  "engines": {
-    "node": ">=20"
+  "devDependencies": {
+    "nx": "22.7.3"
   }
 }

@@ -1,4 +1,8 @@
-import { LoginDto, LoginResponseDto, RefreshTokenDto } from '../dto/auth.controller.dto';
+import {
+  LoginDto,
+  LoginResponseDto,
+  RefreshTokenDto,
+} from '../dto/auth.controller.dto';
 
 export const AUTH_CONTROLLER = 'AUTH_CONTROLLER';
 

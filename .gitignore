@@ -21,3 +21,8 @@ node_modules/
 
 # Ignore Prisma client files
 **/generated/prisma/
+
+
+
+.nx/cache
+.nx/workspace-data

@@ -9,7 +9,10 @@ import {
   IEmailVerificationRepository,
 } from 'src/repositories/interfaces/email-verification.repository.interface';
 import { ITokenService } from './interface/token.service.interface';
-import { GenerateRefreshTokenDto, TokenValidationResponseDto } from './dto/token.service.dto';
+import {
+  GenerateRefreshTokenDto,
+  TokenValidationResponseDto,
+} from './dto/token.service.dto';
 
 @Injectable()
 export class TokensService implements ITokenService {
@@ -30,7 +33,7 @@ export class TokensService implements ITokenService {
       .digest('hex');
     const expiresAt =
       data.expires_at || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    const token = await this.tokensRepository.createRefreshToken({
+    await this.tokensRepository.createRefreshToken({
       token: hashedToken,
       user_id: data.user_id,
       expires_at: expiresAt,
@@ -51,13 +54,18 @@ export class TokensService implements ITokenService {
       const token = await this.tokensRepository.findRefreshToken(hashedToken);
 
       if (!token) return { isValid: false, message: 'Token not found' };
-      if (token.user_id !== userId) return { isValid: false, message: 'Token does not belong to user' };
-      if (token.expires_at < new Date()) return { isValid: false, message: 'Token is expired' };
+      if (token.user_id !== userId)
+        return { isValid: false, message: 'Token does not belong to user' };
+      if (token.expires_at < new Date())
+        return { isValid: false, message: 'Token is expired' };
       if (token.revoked) return { isValid: false, message: 'Token is revoked' };
 
       return { isValid: true };
-    } catch (error) {
-      return { isValid: false, message: 'Error validating token' };
+    } catch (error: any) {
+      return {
+        isValid: false,
+        message: `Error validating token: ${error.message}`,
+      };
     }
   }
 
@@ -147,7 +155,7 @@ export class TokensService implements ITokenService {
       await this.emailVerificationRepository.deleteToken(tokenRecord.id);
 
       return tokenRecord.user_id;
-    } catch (error) {
+    } catch {
       return null;
     }
   }
@@ -193,7 +201,7 @@ export class TokensService implements ITokenService {
       await this.tokensRepository.deletePasswordResetToken(tokenRecord.id);
 
       return tokenRecord.user_id;
-    } catch (error) {
+    } catch {
       return null;
     }
   }

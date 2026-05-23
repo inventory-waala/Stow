@@ -56,7 +56,10 @@ export class AuthController implements IAuthController {
 
   @Post('refresh')
   async refresh(@Body() body: RefreshTokenDto): Promise<LoginResponseDto> {
-    const tokens = await this.authService.refreshToken(body.user_id, body.token);
+    const tokens = await this.authService.refreshToken(
+      body.user_id,
+      body.token,
+    );
     return tokens;
   }
 
@@ -75,7 +78,9 @@ export class AuthController implements IAuthController {
   }
 
   @Post('verify-email')
-  async verifyEmail(@Body('token') token: string): Promise<{ message: string }> {
+  async verifyEmail(
+    @Body('token') token: string,
+  ): Promise<{ message: string }> {
     if (!token) {
       throw new BadRequestException('Token is required');
     }
@@ -83,12 +88,16 @@ export class AuthController implements IAuthController {
   }
 
   @Post('forgot-password')
-  async forgotPassword(@Body() body: ForgotPasswordDto): Promise<{ message: string; resetToken?: string }> {
+  async forgotPassword(
+    @Body() body: ForgotPasswordDto,
+  ): Promise<{ message: string; resetToken?: string }> {
     return this.authService.forgotPassword(body.email);
   }
 
   @Post('reset-password')
-  async resetPassword(@Body() body: ResetPasswordDto): Promise<{ message: string }> {
+  async resetPassword(
+    @Body() body: ResetPasswordDto,
+  ): Promise<{ message: string }> {
     return this.authService.resetPassword(body.token, body.newPassword);
   }
 

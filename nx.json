@@ -1,0 +1,24 @@
+{
+  "$schema": "./node_modules/nx/schemas/nx-schema.json",
+  "targetDefaults": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["{projectRoot}/dist"],
+      "cache": true
+    },
+    "test": {
+      "cache": true,
+      "outputs": ["{projectRoot}/coverage"]
+    },
+    "lint": {
+      "cache": true
+    },
+    "format": {
+      "cache": true
+    },
+    "prisma:generate": {
+      "cache": true,
+      "outputs": ["{projectRoot}/generated/prisma"]
+    }
+  }
+}

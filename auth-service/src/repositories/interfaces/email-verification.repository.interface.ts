@@ -9,7 +9,9 @@ export interface IEmailVerificationRepository {
   createToken(
     data: CreateEmailVerificationTokenDto,
   ): Promise<EmailVerificationTokenProfileDto>;
-  findByToken(hashedToken: string): Promise<EmailVerificationTokenProfileDto | null>;
+  findByToken(
+    hashedToken: string,
+  ): Promise<EmailVerificationTokenProfileDto | null>;
   deleteToken(tokenId: string): Promise<void>;
   deleteUserTokens(userId: string): Promise<void>;
 }

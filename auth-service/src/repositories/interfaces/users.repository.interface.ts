@@ -16,7 +16,5 @@ export interface IUsersRepository {
     userId: string,
     tenantId: string,
   ): Promise<{ roles: string[]; permissions: string[] }>;
-  findFirstUserRole(
-    userId: string,
-  ): Promise<{ tenant_id: string } | null>;
+  findFirstUserRole(userId: string): Promise<{ tenant_id: string } | null>;
 }
