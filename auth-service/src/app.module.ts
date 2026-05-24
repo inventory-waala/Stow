@@ -14,6 +14,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { PasskeyModule } from './modules/passkey/passkey.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
 import { SharedJwtModule } from './shared/shared-jwt.module';
+import { AuthGrpcModule } from './modules/auth/grpc/auth.grpc.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { SharedJwtModule } from './shared/shared-jwt.module';
     PasskeyModule,
     TenantsModule,
     SharedJwtModule,
+    AuthGrpcModule,
   ],
   controllers: [AppController],
   providers: [
