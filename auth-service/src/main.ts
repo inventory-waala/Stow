@@ -39,7 +39,7 @@ async function bootstrap() {
       const allowedOrigins = new ConfigService()
         .get<string>(`CORS_ORIGINS`)
         .split(',');
-      if (!origin || !allowedOrigins.includes(origin)) {
+      if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
         callback(new Error(`Not allowed by CORS`), false);
@@ -59,7 +59,6 @@ async function bootstrap() {
       },
     }),
   );
-
   const port = process.env.PORT ?? 3001;
   await app.listen(port);
   logger.log(`Auth service HTTP is running on port ${port}`);

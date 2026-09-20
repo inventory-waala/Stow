@@ -8,9 +8,9 @@ import {
 import {
   IUsersRepository,
   USERS_REPOSITORY,
-} from 'src/repositories/interfaces/users.repository.interface';
+} from '../../repositories/interfaces/users.repository.interface';
 import * as bcrypt from 'bcryptjs';
-import { UserStatus } from 'generated/prisma/enums';
+import { UserStatus } from '../../../generated/prisma/enums';
 import { JwtService } from '@nestjs/jwt';
 import {
   ITokenService,
