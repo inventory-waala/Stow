@@ -25,3 +25,5 @@ node_modules/
 
 .nx/cache
 .nx/workspace-data
+# playwright-cli session snapshots
+.playwright-cli/
