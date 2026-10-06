@@ -4,7 +4,6 @@ import { getCustomers, getOrders } from "@/lib/orders/data"
 import { getLocations, getProducts } from "@/lib/inventory/data"
 import type { OrderStatus } from "@/lib/orders/types"
 import { PageHeader } from "@/components/layout/page-header"
-import { Button } from "@/components/ui/button"
 import { Panel, ServiceNotice } from "@/components/inventory/primitives"
 import { NewOrderSheet } from "@/components/orders/new-order-sheet"
 import { OrderFilters, OrdersTable } from "@/components/orders/orders-table"
@@ -38,27 +37,26 @@ export default async function OrdersPage({ searchParams }: PageProps<"/orders">)
         title="Orders"
         description="Customer invoices, and the stock they take out."
         action={
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="outline"
-              className="rounded-full"
-              nativeButton={false}
-              render={<Link href="/customers" />}
-            >
-              Customers
-            </Button>
-            <NewOrderSheet
-              customers={customers.ok ? customers.data.items : []}
-              products={products.ok ? products.data.items : []}
-              locations={locations.ok ? locations.data : []}
-            />
-          </div>
+          <NewOrderSheet
+            customers={customers.ok ? customers.data.items : []}
+            products={products.ok ? products.data.items : []}
+            locations={locations.ok ? locations.data : []}
+          />
         }
       />
 
       {!customers.ok ? <ServiceNotice message={customers.error} /> : null}
 
       {orders.ok ? <SummaryStrip summary={orders.data.summary} label="Sold" /> : null}
+
+      {orders.ok ? (
+        <OrderFilters
+          q={query}
+          status={statusFilter}
+          minAmount={minAmount}
+          maxAmount={maxAmount}
+        />
+      ) : null}
 
       {!orders.ok ? (
         <ServiceNotice message={orders.error} />
@@ -68,14 +66,6 @@ export default async function OrdersPage({ searchParams }: PageProps<"/orders">)
             query || statusFilter || minAmount || maxAmount ? "Matching orders" : "Orders"
           }
           description={`${orders.data.total} order${orders.data.total === 1 ? "" : "s"}`}
-          action={
-            <OrderFilters
-              q={query}
-              status={statusFilter}
-              minAmount={minAmount}
-              maxAmount={maxAmount}
-            />
-          }
         >
           <OrdersTable items={orders.data.items} />
         </Panel>

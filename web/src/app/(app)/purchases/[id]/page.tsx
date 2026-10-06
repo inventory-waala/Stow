@@ -136,7 +136,7 @@ export default async function PurchasePage({ params }: PageProps<"/purchases/[id
         </Panel>
 
         <div className="space-y-4">
-          <Panel title="Receive stock" className="p-0">
+          <Panel title="Receive stock">
             <div className="px-5 pb-5">
               <ReceiveBox purchase={po} locations={locations.ok ? locations.data : []} />
             </div>

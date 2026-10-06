@@ -9,7 +9,7 @@ export default async function CustomersPage() {
   const customers = await getCustomers()
 
   return (
-    <>
+    <div className="grid gap-6 *:min-w-0">
       <PageHeader
         title="Customers"
         description="Who you sell to, and their tax identity."
@@ -26,6 +26,6 @@ export default async function CustomersPage() {
           <CustomersTable items={customers.data.items} />
         </Panel>
       )}
-    </>
+    </div>
   )
 }

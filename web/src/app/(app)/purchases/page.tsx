@@ -4,7 +4,6 @@ import { getPurchases, getSuppliers } from "@/lib/purchases/data"
 import { getLocations, getProducts } from "@/lib/inventory/data"
 import type { PurchaseStatus } from "@/lib/purchases/types"
 import { PageHeader } from "@/components/layout/page-header"
-import { Button } from "@/components/ui/button"
 import { Panel, ServiceNotice } from "@/components/inventory/primitives"
 import { NewPurchaseSheet } from "@/components/purchases/new-purchase-sheet"
 import { PurchaseFilters, PurchasesTable } from "@/components/purchases/purchases-table"
@@ -38,21 +37,11 @@ export default async function PurchasesPage({ searchParams }: PageProps<"/purcha
         title="Purchases"
         description="Supplier invoices, and the stock they bring in."
         action={
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="outline"
-              className="rounded-full"
-              nativeButton={false}
-              render={<Link href="/purchases/suppliers" />}
-            >
-              Suppliers
-            </Button>
-            <NewPurchaseSheet
-              suppliers={suppliers.ok ? suppliers.data.items : []}
-              products={products.ok ? products.data.items : []}
-              locations={locations.ok ? locations.data : []}
-            />
-          </div>
+          <NewPurchaseSheet
+            suppliers={suppliers.ok ? suppliers.data.items : []}
+            products={products.ok ? products.data.items : []}
+            locations={locations.ok ? locations.data : []}
+          />
         }
       />
 
@@ -60,6 +49,17 @@ export default async function PurchasesPage({ searchParams }: PageProps<"/purcha
 
       {purchases.ok ? (
         <SummaryStrip summary={purchases.data.summary} label="Purchased" />
+      ) : null}
+
+      {/* Five controls are too many for the panel header, which would squeeze
+          the title; they get their own row. */}
+      {purchases.ok ? (
+        <PurchaseFilters
+          q={query}
+          status={statusFilter}
+          minAmount={minAmount}
+          maxAmount={maxAmount}
+        />
       ) : null}
 
       {!purchases.ok ? (
@@ -72,14 +72,6 @@ export default async function PurchasesPage({ searchParams }: PageProps<"/purcha
               : "Purchase orders"
           }
           description={`${purchases.data.total} order${purchases.data.total === 1 ? "" : "s"}`}
-          action={
-            <PurchaseFilters
-              q={query}
-              status={statusFilter}
-              minAmount={minAmount}
-              maxAmount={maxAmount}
-            />
-          }
         >
           <PurchasesTable items={purchases.data.items} />
         </Panel>
