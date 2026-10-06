@@ -26,8 +26,9 @@ import {
   SidebarHeader,
 } from "@/components/ui/sidebar"
 
-// Route map carried over from the previous app; pages land here as the
-// inventory/order/customer services come online.
+// Route map carried over from the previous app. Dashboard, Inventory,
+// Purchases, Orders and Customers are live; Team and Reports are still
+// placeholders waiting on their services.
 const navMain = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboardIcon },
   { title: "Inventory", url: "/inventory", icon: ArchiveIcon },
