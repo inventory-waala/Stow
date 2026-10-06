@@ -17,14 +17,17 @@
     "subscription-service",
     "transaction-service",
     "vault-service",
-    "vendor-service"
+    "vendor-service",
+    "web"
   ],
   "scripts": {
     "build": "nx run-many -t build",
     "lint": "nx run-many -t lint",
     "test": "nx run-many -t test",
     "format": "nx format:write",
-    "start:auth:dev": "nx run auth-service:start:dev"
+    "start:auth:dev": "nx run auth-service:start:dev",
+    "start:web:dev": "nx run web:dev",
+    "start:inventory:dev": "nx run inventory-service:start:dev"
   },
   "devDependencies": {
     "nx": "22.7.3"
