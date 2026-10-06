@@ -94,17 +94,23 @@ export class CreateOrderDto {
   /** Tax rates as percentages; the amounts are computed from the taxable value. */
   @IsOptional()
   @IsNumberString()
-  @Matches(RATE, { message: 'cgst_rate must be a percentage between 0 and 100' })
+  @Matches(RATE, {
+    message: 'cgst_rate must be a percentage between 0 and 100',
+  })
   cgst_rate?: string;
 
   @IsOptional()
   @IsNumberString()
-  @Matches(RATE, { message: 'sgst_rate must be a percentage between 0 and 100' })
+  @Matches(RATE, {
+    message: 'sgst_rate must be a percentage between 0 and 100',
+  })
   sgst_rate?: string;
 
   @IsOptional()
   @IsNumberString()
-  @Matches(RATE, { message: 'igst_rate must be a percentage between 0 and 100' })
+  @Matches(RATE, {
+    message: 'igst_rate must be a percentage between 0 and 100',
+  })
   igst_rate?: string;
 
   @IsOptional()
@@ -226,4 +232,19 @@ export class ListOrdersDto extends PaginationDto {
   @IsOptional()
   @IsDateString()
   to?: string;
+
+  /** Inclusive bounds on total_amount. */
+  @IsOptional()
+  @IsNumberString()
+  @Matches(POSITIVE_DECIMAL, {
+    message: 'min_amount must be a positive decimal',
+  })
+  min_amount?: string;
+
+  @IsOptional()
+  @IsNumberString()
+  @Matches(POSITIVE_DECIMAL, {
+    message: 'max_amount must be a positive decimal',
+  })
+  max_amount?: string;
 }

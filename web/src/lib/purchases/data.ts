@@ -22,7 +22,14 @@ export const getSuppliers = cache((params: { q?: string; status?: string } = {})
 )
 export const getSupplier = cache((id: string) => load((t) => vendorApi.supplier(t, id)))
 export const getPurchases = cache(
-  (params: { q?: string; status?: string; supplier?: string } = {}) =>
-    load((t) => vendorApi.purchases(t, { ...params, limit: 100 }))
+  (
+    params: {
+      q?: string
+      status?: string
+      supplier?: string
+      min_amount?: string
+      max_amount?: string
+    } = {}
+  ) => load((t) => vendorApi.purchases(t, { ...params, limit: 100 }))
 )
 export const getPurchase = cache((id: string) => load((t) => vendorApi.purchase(t, id)))

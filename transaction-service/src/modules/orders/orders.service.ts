@@ -7,7 +7,6 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { rethrowPrisma } from '../../common/prisma-errors';
-import { Page } from '../../common/dto/pagination.dto';
 import { InventoryClient } from '../../inventory/inventory.client';
 import { computeTotals } from './order-totals';
 import { dec, str } from '../../common/money';
@@ -65,12 +64,20 @@ export class OrdersService {
     private readonly inventory: InventoryClient,
   ) {}
 
-  async list(tenantId: string, query: ListOrdersDto): Promise<Page<any>> {
+  async list(tenantId: string, query: ListOrdersDto) {
     const where: Prisma.OrderWhereInput = {
       tenant_id: tenantId,
       deleted_at: null,
       ...(query.status ? { status: query.status } : {}),
       ...(query.customer ? { customer_id: query.customer } : {}),
+      ...(query.min_amount || query.max_amount
+        ? {
+            total_amount: {
+              ...(query.min_amount ? { gte: query.min_amount } : {}),
+              ...(query.max_amount ? { lte: query.max_amount } : {}),
+            },
+          }
+        : {}),
       ...(query.from || query.to
         ? {
             order_date: {
@@ -91,7 +98,7 @@ export class OrdersService {
 
     const limit = query.limit ?? 50;
     const offset = query.offset ?? 0;
-    const [rows, total] = await Promise.all([
+    const [rows, total, grouped] = await Promise.all([
       this.prisma.order.findMany({
         where,
         orderBy: [{ order_date: 'desc' }, { created_at: 'desc' }],
@@ -100,9 +107,23 @@ export class OrdersService {
         include: ORDER_INCLUDE,
       }),
       this.prisma.order.count({ where }),
+      // Aggregated over the whole filtered set, not just this page, so the
+      // header figure does not change as you page through.
+      this.prisma.order.groupBy({
+        by: ['status'],
+        where,
+        _count: { _all: true },
+        _sum: { total_amount: true },
+      }),
     ]);
 
-    return { items: rows.map(serialize), total, limit, offset };
+    return {
+      items: rows.map(serialize),
+      total,
+      limit,
+      offset,
+      summary: summarise(total, grouped),
+    };
   }
 
   async get(tenantId: string, id: string) {
@@ -543,6 +564,31 @@ export class OrdersService {
     const seq = last ? Number(last.invoice_no.slice(prefix.length)) + 1 : 1;
     return `${prefix}${String(seq).padStart(4, '0')}`;
   }
+}
+
+/**
+ * What the filtered set is worth, in total and per status — the sales figure
+ * the list header shows. Aggregated in the database so paging cannot change it.
+ */
+function summarise(
+  total: number,
+  grouped: Array<{
+    status: string;
+    _count: { _all: number };
+    _sum: { total_amount: any };
+  }>,
+) {
+  const by_status: Record<string, { count: number; total_amount: string }> = {};
+  let sum = dec(0);
+  for (const row of grouped) {
+    const amount = dec(row._sum.total_amount?.toString());
+    sum = sum.add(amount);
+    by_status[row.status] = {
+      count: row._count._all,
+      total_amount: str(amount),
+    };
+  }
+  return { count: total, total_amount: str(sum), by_status };
 }
 
 /** Percentage a stored tax amount represents of the taxable value. */

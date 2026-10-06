@@ -19,12 +19,16 @@ import { StatusBadge } from "@/components/commerce/status-badge"
 export function PurchaseFilters({
   q,
   status,
+  minAmount,
+  maxAmount,
 }: {
   q?: string
   status?: PurchaseStatus
+  minAmount?: string
+  maxAmount?: string
 }) {
   return (
-    <form action="/purchases" className="flex w-full max-w-lg items-center gap-2">
+    <form action="/purchases" className="flex w-full flex-wrap items-center gap-2 lg:max-w-2xl">
       <div className="relative flex-1">
         <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
@@ -49,6 +53,22 @@ export function PurchaseFilters({
           </option>
         ))}
       </select>
+      <Input
+        name="min_amount"
+        defaultValue={minAmount}
+        inputMode="decimal"
+        placeholder="Min ₹"
+        className="w-24"
+        aria-label="Minimum total"
+      />
+      <Input
+        name="max_amount"
+        defaultValue={maxAmount}
+        inputMode="decimal"
+        placeholder="Max ₹"
+        className="w-24"
+        aria-label="Maximum total"
+      />
       <Button type="submit" variant="outline" className="rounded-full">
         Filter
       </Button>

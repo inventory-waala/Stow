@@ -87,6 +87,17 @@ export interface Page<T> {
   offset: number
 }
 
+/** What a filtered document list is worth, aggregated server-side. */
+export interface ListSummary {
+  count: number
+  total_amount: string
+  by_status: Record<string, { count: number; total_amount: string }>
+}
+
+export interface SummarisedPage<T> extends Page<T> {
+  summary: ListSummary
+}
+
 /** `{ ok }` so a page can render a notice instead of crashing when a service is down. */
 export type Loaded<T> = { ok: true; data: T } | { ok: false; error: string }
 

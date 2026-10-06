@@ -212,4 +212,15 @@ export class ListPurchasesDto extends PaginationDto {
   @IsOptional()
   @IsDateString()
   to?: string;
+
+  /** Inclusive bounds on total_amount, as justanidea's purchase filters had. */
+  @IsOptional()
+  @IsNumberString()
+  @Matches(POSITIVE_DECIMAL, { message: 'min_amount must be a positive decimal' })
+  min_amount?: string;
+
+  @IsOptional()
+  @IsNumberString()
+  @Matches(POSITIVE_DECIMAL, { message: 'max_amount must be a positive decimal' })
+  max_amount?: string;
 }

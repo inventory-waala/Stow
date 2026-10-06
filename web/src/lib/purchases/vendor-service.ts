@@ -1,6 +1,11 @@
 import "server-only"
 
-import { qs, serviceRequest, type Page } from "@/lib/service-client"
+import {
+  qs,
+  serviceRequest,
+  type Page,
+  type SummarisedPage,
+} from "@/lib/service-client"
 import type { PurchaseOrder, PurchaseStatus, Supplier } from "./types"
 
 export const VENDOR_SERVICE_URL = (
@@ -69,9 +74,11 @@ export const vendorApi = {
       supplier?: string
       from?: string
       to?: string
+      min_amount?: string
+      max_amount?: string
       limit?: number
     } = {}
-  ) => request<Page<PurchaseOrder>>(token, `/purchases${qs(params)}`),
+  ) => request<SummarisedPage<PurchaseOrder>>(token, `/purchases${qs(params)}`),
   purchase: (token: string, id: string) =>
     request<PurchaseOrder>(token, `/purchases/${id}`),
   createPurchase: (token: string, body: NewPurchase) =>

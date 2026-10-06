@@ -1,6 +1,11 @@
 import "server-only"
 
-import { qs, serviceRequest, type Page } from "@/lib/service-client"
+import {
+  qs,
+  serviceRequest,
+  type Page,
+  type SummarisedPage,
+} from "@/lib/service-client"
 import type { Customer, Order, OrderStatus } from "./types"
 
 export const TRANSACTION_SERVICE_URL = (
@@ -71,9 +76,11 @@ export const transactionApi = {
       customer?: string
       from?: string
       to?: string
+      min_amount?: string
+      max_amount?: string
       limit?: number
     } = {}
-  ) => request<Page<Order>>(token, `/orders${qs(params)}`),
+  ) => request<SummarisedPage<Order>>(token, `/orders${qs(params)}`),
   order: (token: string, id: string) => request<Order>(token, `/orders/${id}`),
   createOrder: (token: string, body: NewOrder) =>
     request<Order>(token, "/orders", { method: "POST", body: JSON.stringify(body) }),

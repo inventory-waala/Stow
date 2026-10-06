@@ -24,7 +24,14 @@ export const getCustomer = cache((id: string) =>
   load((t) => transactionApi.customer(t, id))
 )
 export const getOrders = cache(
-  (params: { q?: string; status?: string; customer?: string } = {}) =>
-    load((t) => transactionApi.orders(t, { ...params, limit: 100 }))
+  (
+    params: {
+      q?: string
+      status?: string
+      customer?: string
+      min_amount?: string
+      max_amount?: string
+    } = {}
+  ) => load((t) => transactionApi.orders(t, { ...params, limit: 100 }))
 )
 export const getOrder = cache((id: string) => load((t) => transactionApi.order(t, id)))
