@@ -1,0 +1,300 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum MovementType {
+  IN
+  OUT
+  ADJUST
+  TRANSFER
+}
+
+enum BarcodeType {
+  CODE128
+  CODE39
+  CODE93
+  EAN13
+  EAN8
+  UPC_A
+  UPC_E
+  QR_CODE
+  DATA_MATRIX
+  PDF417
+  AZTEC
+  CODABAR
+  ITF
+  CUSTOM
+}
+
+// ---------------------------------------------------------------------------
+// Conventions
+//
+// - Every table is scoped by tenant_id (matches auth-service Tenant.id).
+//   No FK: tenants live in another service.
+// - Every table has a jsonb column for tenant-defined data. Only fields that
+//   need indexing, uniqueness or FK behaviour are promoted to real columns.
+//   `attributes` / `options` / `payload` = user data; `metadata` = service
+//   bookkeeping (source system, import ids, sync state). Keeping them apart
+//   means user-defined keys can never collide with ours.
+// - supplier_id / actor_id are loose references into vendor-service and
+//   auth-service respectively.
+// ---------------------------------------------------------------------------
+
+// Describes one kind of variant ("sized apparel", "bottled", "single item").
+// `attribute_schema` lists the variant's fields (colour, supplier code…).
+// `axis_key` names the ONE field whose values each get their own price and
+// stock — Size, Capacity, Pack, Shade: whatever the tenant sells. If that
+// field is a choice (enum) its choices are the only allowed values; a text
+// field allows any value. Null axis: the variant is a single stock unit.
+model VariantType {
+  id               String   @id @default(cuid())
+  tenant_id        String
+  key              String
+  name             String
+  description      String?
+  attribute_schema Json     @default("{}")
+  axis_key         String?
+  metadata         Json     @default("{}")
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  variants Variant[]
+
+  @@unique([tenant_id, key])
+  @@index([tenant_id])
+  @@map("variant_types")
+}
+
+// Optional tree for grouping (Menswear > Innerwear > Briefs, or Storage > SSD).
+model Category {
+  id          String   @id @default(cuid())
+  tenant_id   String
+  parent_id   String?
+  slug        String
+  name        String
+  description String?
+  attributes  Json     @default("{}")
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  parent   Category?  @relation("CategoryTree", fields: [parent_id], references: [id], onDelete: Restrict)
+  children Category[] @relation("CategoryTree")
+  products Product[]
+
+  @@unique([tenant_id, slug])
+  @@index([tenant_id])
+  @@index([parent_id])
+  @@map("categories")
+}
+
+// The thing being catalogued: a name, a code, tags and whatever free-form
+// `attributes` the tenant wants to record. Never holds stock itself; stock is
+// tracked on the Sizes of its Variants. A product with no meaningful
+// variation still gets one Variant with one "Default" Size so every stock
+// path is uniform.
+model Product {
+  id              String        @id @default(cuid())
+  tenant_id       String
+  category_id     String?
+  code            String?
+  name            String
+  description     String?
+  status          ProductStatus @default(ACTIVE)
+  tags            String[]      @default([])
+  attributes      Json          @default("{}")
+  metadata        Json          @default("{}")
+  created_at      DateTime      @default(now())
+  updated_at      DateTime      @updatedAt
+  deleted_at      DateTime?
+
+  category Category? @relation(fields: [category_id], references: [id], onDelete: SetNull)
+  variants Variant[]
+
+  @@unique([tenant_id, code])
+  @@index([tenant_id])
+  @@index([tenant_id, status])
+  @@index([tenant_id, category_id])
+  @@index([tenant_id, deleted_at])
+  @@index([attributes(ops: JsonbPathOps)], type: Gin)
+  @@index([tags], type: Gin)
+  @@map("products")
+}
+
+// A named version of a product — "Navy", "1001 BOYLEG", "Steel finish" —
+// with its own properties (validated by its VariantType) and its own Sizes.
+// Variants of one product may use different VariantTypes. Nothing is stocked
+// or priced here; that is per Size.
+model Variant {
+  id              String        @id @default(cuid())
+  tenant_id       String
+  product_id      String
+  variant_type_id String?
+  name            String
+  status          ProductStatus @default(ACTIVE)
+  supplier_id     String?
+  sort            Int           @default(0)
+  attributes      Json          @default("{}")
+  metadata        Json          @default("{}")
+  created_at      DateTime      @default(now())
+  updated_at      DateTime      @updatedAt
+  deleted_at      DateTime?
+
+  product      Product      @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  variant_type VariantType? @relation(fields: [variant_type_id], references: [id], onDelete: SetNull)
+  sizes        Size[]
+
+  @@unique([tenant_id, product_id, name])
+  @@index([tenant_id])
+  @@index([product_id])
+  @@index([tenant_id, variant_type_id])
+  @@index([tenant_id, deleted_at])
+  @@index([attributes(ops: JsonbPathOps)], type: Gin)
+  @@map("variants")
+}
+
+// The stockable / sellable unit: one row per value of the variant's axis
+// field ("M", "500 ml", "12-pack"; "Default" for single-unit variants). The
+// model is called Size for brevity, but `label` is whatever the axis field
+// is — that is the tenant's choice, not ours. Prices are here because each
+// unit is priced on its own; anything else (MRP, price lists) goes in
+// `attributes`.
+model Size {
+  id         String    @id @default(cuid())
+  tenant_id  String
+  variant_id String
+  label      String
+  sku        String?
+  cost_price Decimal?  @db.Decimal(18, 4)
+  sell_price Decimal?  @db.Decimal(18, 4)
+  currency   String    @default("INR")
+  unit       String    @default("pcs")
+  sort       Int       @default(0)
+  attributes Json      @default("{}")
+  metadata   Json      @default("{}")
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  variant   Variant         @relation(fields: [variant_id], references: [id], onDelete: Cascade)
+  barcodes  Barcode[]
+  stock     StockLevel[]
+  movements StockMovement[]
+
+  @@unique([tenant_id, sku])
+  @@unique([variant_id, label])
+  @@index([tenant_id])
+  @@index([variant_id])
+  @@index([tenant_id, deleted_at])
+  @@map("variant_sizes")
+}
+
+// A size can carry several codes (manufacturer EAN + internal CODE128 +
+// a QR for the shelf label). Lookup by scanned value is the hot path.
+model Barcode {
+  id         String      @id @default(cuid())
+  tenant_id  String
+  size_id    String
+  value      String
+  type       BarcodeType @default(CODE128)
+  is_primary Boolean     @default(false)
+  metadata   Json        @default("{}")
+  created_at DateTime    @default(now())
+
+  size Size @relation(fields: [size_id], references: [id], onDelete: Cascade)
+
+  @@unique([tenant_id, value])
+  @@index([size_id])
+  @@map("barcodes")
+}
+
+// Hierarchical: warehouse -> zone -> shelf -> bin, or a single "Main store".
+// Each tenant gets one default Location seeded so single-site tenants never
+// have to think about it.
+model Location {
+  id          String   @id @default(cuid())
+  tenant_id   String
+  parent_id   String?
+  code        String
+  name        String
+  description String?
+  is_default  Boolean  @default(false)
+  attributes  Json     @default("{}")
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  parent         Location?       @relation("LocationTree", fields: [parent_id], references: [id], onDelete: Restrict)
+  children       Location[]      @relation("LocationTree")
+  stock          StockLevel[]
+  movements_from StockMovement[] @relation("MovementFrom")
+  movements_to   StockMovement[] @relation("MovementTo")
+
+  @@unique([tenant_id, code])
+  @@index([tenant_id])
+  @@index([parent_id])
+  @@map("locations")
+}
+
+// Current on-hand quantity of a size at a location. This is the single
+// source of truth for stock; totals are SUM(quantity) GROUP BY size_id.
+model StockLevel {
+  id          String   @id @default(cuid())
+  tenant_id   String
+  size_id     String
+  location_id String
+  quantity    Decimal  @default(0) @db.Decimal(18, 4)
+  reserved    Decimal  @default(0) @db.Decimal(18, 4)
+  reorder_at  Decimal? @db.Decimal(18, 4)
+  attributes  Json     @default("{}")
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  size     Size     @relation(fields: [size_id], references: [id], onDelete: Cascade)
+  location Location @relation(fields: [location_id], references: [id], onDelete: Restrict)
+
+  @@unique([size_id, location_id])
+  @@index([tenant_id])
+  @@index([location_id])
+  @@map("stock_levels")
+}
+
+// Append-only ledger; replaces Inventory_logs. Every StockLevel change is
+// written here in the same transaction. reference_type/reference_id link to
+// the document that caused it (order, purchase, stock-take) and `payload`
+// keeps whatever else that document wants to attach (unit cost, batch no).
+model StockMovement {
+  id               String       @id @default(cuid())
+  tenant_id        String
+  size_id          String
+  type             MovementType
+  quantity         Decimal      @db.Decimal(18, 4)
+  from_location_id String?
+  to_location_id   String?
+  actor_id         String?
+  reference_type   String?
+  reference_id     String?
+  reason           String?
+  payload          Json         @default("{}")
+  occurred_at      DateTime     @default(now())
+  created_at       DateTime     @default(now())
+
+  size          Size      @relation(fields: [size_id], references: [id], onDelete: Cascade)
+  from_location Location? @relation("MovementFrom", fields: [from_location_id], references: [id], onDelete: SetNull)
+  to_location   Location? @relation("MovementTo", fields: [to_location_id], references: [id], onDelete: SetNull)
+
+  @@index([tenant_id, occurred_at])
+  @@index([size_id, occurred_at])
+  @@index([tenant_id, reference_type, reference_id])
+  @@map("stock_movements")
+}
