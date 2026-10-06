@@ -3,11 +3,11 @@ import * as crypto from 'crypto';
 import {
   ITokensRepository,
   TOKENS_REPOSITORY,
-} from 'src/repositories/interfaces/tokens.repository.interface';
+} from '../../repositories/interfaces/tokens.repository.interface';
 import {
   EMAIL_VERIFICATION_REPOSITORY,
   IEmailVerificationRepository,
-} from 'src/repositories/interfaces/email-verification.repository.interface';
+} from '../../repositories/interfaces/email-verification.repository.interface';
 import { ITokenService } from './interface/token.service.interface';
 import {
   GenerateRefreshTokenDto,

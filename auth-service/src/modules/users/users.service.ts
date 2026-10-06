@@ -16,6 +16,7 @@ import {
   TOKEN_SERVICE,
 } from '../tokens/interface/token.service.interface';
 import { TenantsService } from '../tenants/tenants.service';
+import { MailService } from '../mail/mail.service';
 
 @Injectable()
 export class UsersService implements IUsersService {
@@ -27,6 +28,7 @@ export class UsersService implements IUsersService {
     @Inject(TOKEN_SERVICE)
     private readonly tokenService: ITokenService,
     private readonly tenantsService: TenantsService,
+    private readonly mailService: MailService,
   ) {}
 
   async register(user: RegisterUserDto) {
@@ -46,19 +48,39 @@ export class UsersService implements IUsersService {
       name: user.name,
     });
 
-    // Auto-provision a tenant + owner role for this user
-    const tenantId = await this.tenantsService.createWithOwnerRole(
-      newUser.id,
-      user.name || user.email.split('@')[0],
-    );
+    // Auto-provision a tenant + owner role for this user.
+    // The user row is already committed, so if provisioning fails we must undo
+    // it -- otherwise the account exists with no tenant and the email is burned:
+    // the caller can never retry, because registration would then report
+    // "Email is already in use".
+    let tenantId: string;
+    let verificationToken: string;
+    try {
+      tenantId = await this.tenantsService.createWithOwnerRole(
+        newUser.id,
+        user.name || user.email.split('@')[0],
+      );
 
-    const verificationToken =
-      await this.tokenService.generateEmailVerificationToken(newUser.id);
+      verificationToken =
+        await this.tokenService.generateEmailVerificationToken(newUser.id);
+    } catch (error) {
+      await this.usersRepository.deleteUser(newUser.id).catch(() => {
+        // Nothing more we can do; surface the original failure below.
+      });
+      throw error;
+    }
 
+    // Fire-and-forget: MailService never throws, and registration must not
+    // wait on SMTP round-trips.
+    void this.mailService.sendVerificationEmail(newUser.email, verificationToken);
+
+    const { password: _password, ...safeUser } = newUser;
     return {
-      ...newUser,
+      ...safeUser,
       tenantId,
-      verificationToken,
+      // The raw token is only exposed outside production so local flows can
+      // be completed without a mailbox; in production it travels by email only.
+      ...(process.env.NODE_ENV !== 'production' ? { verificationToken } : {}),
     };
   }
 

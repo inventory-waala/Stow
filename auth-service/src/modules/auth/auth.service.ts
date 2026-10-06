@@ -8,14 +8,15 @@ import {
 import {
   IUsersRepository,
   USERS_REPOSITORY,
-} from 'src/repositories/interfaces/users.repository.interface';
+} from '../../repositories/interfaces/users.repository.interface';
 import * as bcrypt from 'bcryptjs';
-import { UserStatus } from 'generated/prisma/enums';
+import { UserStatus } from '../../../generated/prisma/enums';
 import { JwtService } from '@nestjs/jwt';
 import {
   ITokenService,
   TOKEN_SERVICE,
 } from '../tokens/interface/token.service.interface';
+import { MailService } from '../mail/mail.service';
 
 @Injectable()
 export class AuthService implements IAuthService {
@@ -25,6 +26,7 @@ export class AuthService implements IAuthService {
     @Inject(TOKEN_SERVICE)
     private readonly tokenService: ITokenService,
     private readonly jwt: JwtService,
+    private readonly mailService: MailService,
   ) {}
 
   async validateUser(loginData: loginDto): Promise<UserProfileDto> {
@@ -56,9 +58,66 @@ export class AuthService implements IAuthService {
 
   async login(loginData: loginDto): Promise<LoginResponseDto> {
     const userData = await this.validateUser(loginData);
+    return this.issueTokens(userData, loginData.tenant_id);
+  }
 
+  /**
+   * Session for a user who has already proven their identity by another
+   * factor (passkey assertion). Applies the same status checks as a password
+   * login so a suspended or unverified account cannot bypass them.
+   */
+  async loginWithVerifiedUser(userId: string): Promise<LoginResponseDto> {
+    const user = await this.usersRepository.findById(userId);
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+    this.assertActive(user.status);
+    return this.issueTokens(user);
+  }
+
+  private assertActive(status: UserStatus): void {
+    switch (status) {
+      case UserStatus.PENDING_VERIFICATION:
+        throw new BadRequestException('Email not verified');
+      case UserStatus.SUSPENDED:
+        throw new BadRequestException('User suspended');
+      case UserStatus.ACTIVE:
+        return;
+      default:
+        throw new BadRequestException('Invalid user status');
+    }
+  }
+
+  /**
+   * Signs an access token carrying the user's RBAC context for `tenantId`
+   * (or their first tenant) and mints a refresh token.
+   */
+  private async issueTokens(
+    userData: UserProfileDto,
+    requestedTenantId?: string,
+  ): Promise<LoginResponseDto> {
+    const accessToken = this.jwt.sign(
+      await this.buildAccessPayload(userData, requestedTenantId),
+    );
+    const refreshToken = await this.tokenService.generateRefreshToken({
+      user_id: userData.id,
+    });
+
+    return { accessToken, refreshToken };
+  }
+
+  /**
+   * The access-token claims. Every path that signs a token (login, passkey
+   * login, refresh) must go through here so the tenant/RBAC context is never
+   * dropped — a token without tenant_id locks the user out of every
+   * tenant-scoped service until they log in again.
+   */
+  private async buildAccessPayload(
+    userData: UserProfileDto,
+    requestedTenantId?: string,
+  ): Promise<Record<string, any>> {
     // Resolve tenant: use provided tenant_id OR fall back to user's first tenant
-    let tenantId = loginData.tenant_id;
+    let tenantId = requestedTenantId;
     if (!tenantId) {
       const firstRole = await this.usersRepository.findFirstUserRole(
         userData.id,
@@ -66,7 +125,6 @@ export class AuthService implements IAuthService {
       tenantId = firstRole?.tenant_id ?? undefined;
     }
 
-    // Build base JWT payload
     const payload: Record<string, any> = {
       id: userData.id,
       email: userData.email,
@@ -86,17 +144,19 @@ export class AuthService implements IAuthService {
       payload.permissions = rbac.permissions;
     }
 
-    const accessToken = this.jwt.sign(payload);
-    const refreshToken = await this.tokenService.generateRefreshToken({
-      user_id: userData.id,
-    });
-
-    return { accessToken, refreshToken };
+    return payload;
   }
 
+  /**
+   * `tenantId` is the workspace the expiring access token was in; the client
+   * passes it so a silent refresh keeps the user where they were. It is only
+   * honoured if they still belong to that tenant, otherwise the token falls
+   * back to their first tenant exactly like a fresh login.
+   */
   async refreshToken(
     userId: string,
     rawToken: string,
+    tenantId?: string,
   ): Promise<LoginResponseDto> {
     const validationResult = await this.tokenService.validateRefreshToken(
       userId,
@@ -124,15 +184,17 @@ export class AuthService implements IAuthService {
         throw new BadRequestException('Invalid user status');
     }
 
-    const payload = {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      status: user.status,
-      is_email_verified: user.is_email_verified,
-    };
-
-    const accessToken = this.jwt.sign(payload);
+    let requestedTenantId = tenantId;
+    if (requestedTenantId) {
+      const rbac = await this.usersRepository.findUserRolesAndPermissions(
+        user.id,
+        requestedTenantId,
+      );
+      if (rbac.roles.length === 0) requestedTenantId = undefined;
+    }
+    const accessToken = this.jwt.sign(
+      await this.buildAccessPayload(user, requestedTenantId),
+    );
 
     // 3. Rotate the refresh token natively (preserves original token expiry)
     const refreshToken = await this.tokenService.rotateRefreshToken(
@@ -172,11 +234,13 @@ export class AuthService implements IAuthService {
       user.id,
     );
 
-    // MOCK EMAIL SENDING by returning the token directly
+    void this.mailService.sendPasswordResetEmail(user.email, resetToken);
+
     return {
       message:
         'If that email exists in our system, a password reset email has been sent.',
-      resetToken, // TODO: Remove this once Kafka email sending is implemented in Phase 8
+      // Exposed outside production only, so the flow can be exercised locally.
+      ...(process.env.NODE_ENV !== 'production' ? { resetToken } : {}),
     };
   }
 

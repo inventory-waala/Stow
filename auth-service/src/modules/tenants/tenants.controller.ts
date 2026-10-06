@@ -16,8 +16,9 @@ export class TenantsController {
 
   @UseGuards(JwtAuthGuard)
   @Post()
-  async create(@Body() body: CreateTenantRequestDto) {
-    return this.tenantsService.create(body);
+  async create(@Request() req: any, @Body() body: CreateTenantRequestDto) {
+    // The creator becomes the tenant owner; switch-tenant to act in it.
+    return this.tenantsService.create(req.user.id, body);
   }
 
   @UseGuards(JwtAuthGuard)

@@ -7,6 +7,7 @@ export const USERS_REPOSITORY = 'USERS_REPOSITORY';
 
 export interface IUsersRepository {
   newUser(data: CreateUserRepositoryDto): Promise<UserProfileDto>;
+  deleteUser(id: string): Promise<void>;
   findByEmail(email: string): Promise<UserProfileDto | null>;
   findById(id: string): Promise<UserProfileDto | null>;
   findProfileById(id: string): Promise<UserProfileDto | null>;

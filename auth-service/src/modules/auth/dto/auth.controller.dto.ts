@@ -5,7 +5,7 @@ import {
   IsOptional,
   IsArray,
 } from 'class-validator';
-import { UserStatus } from 'generated/prisma/enums';
+import { UserStatus } from '../../../../generated/prisma/enums';
 
 export class ForgotPasswordDto {
   @IsEmail()
@@ -39,6 +39,11 @@ export class RefreshTokenDto {
 
   @IsString()
   user_id: string;
+
+  /** Workspace to keep the session in; see AuthService.refreshToken. */
+  @IsOptional()
+  @IsString()
+  tenant_id?: string;
 }
 
 export interface LoginResponseDto {

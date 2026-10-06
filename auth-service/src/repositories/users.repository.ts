@@ -34,6 +34,11 @@ export class UsersRepository implements IUsersRepository {
     }) as unknown as Promise<UserProfileDto>;
   }
 
+  /** Used to roll back a half-finished registration. */
+  async deleteUser(id: string): Promise<void> {
+    await this.prisma.user.delete({ where: { id } });
+  }
+
   async findByEmail(email: string) {
     return this.prisma.user.findUnique({
       where: { email },

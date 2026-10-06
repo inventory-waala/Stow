@@ -7,9 +7,13 @@ export interface IAuthService {
   login(
     loginData: loginDto,
   ): Promise<{ accessToken: string; refreshToken: string }>;
+  loginWithVerifiedUser(
+    userId: string,
+  ): Promise<{ accessToken: string; refreshToken: string }>;
   refreshToken(
     userId: string,
     refreshToken: string,
+    tenantId?: string,
   ): Promise<{ accessToken: string; refreshToken: string }>;
   verifyEmail(token: string): Promise<{ message: string }>;
   forgotPassword(
