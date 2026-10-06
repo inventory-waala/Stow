@@ -30,6 +30,13 @@
     "start:inventory:dev": "nx run inventory-service:start:dev"
   },
   "devDependencies": {
-    "nx": "22.7.3"
+    "nx": "22.7.12"
+  },
+  "overrides": {
+    "axios": "^1.20.0",
+    "smol-toml": "^1.9.0",
+    "minimatch@^10": {
+      "brace-expansion": "^5.0.12"
+    }
   }
 }
