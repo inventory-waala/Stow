@@ -15,6 +15,7 @@ import { PasskeyModule } from './modules/passkey/passkey.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
 import { SharedJwtModule } from './shared/shared-jwt.module';
 import { AuthGrpcModule } from './modules/auth/grpc/auth.grpc.module';
+import { MailModule } from './modules/mail/mail.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { AuthGrpcModule } from './modules/auth/grpc/auth.grpc.module';
     TenantsModule,
     SharedJwtModule,
     AuthGrpcModule,
+    MailModule,
   ],
   controllers: [AppController],
   providers: [
