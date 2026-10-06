@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../../generated/prisma/client';
+import { buildConnectionConfig, isUnverifiedTls } from './connection-config';
 
 @Injectable()
 export class PrismaService
@@ -15,15 +16,15 @@ export class PrismaService
   private readonly logger = new Logger(PrismaService.name);
 
   constructor() {
-    const connectionString = process.env.DATABASE_URL;
+    const config = buildConnectionConfig();
+    super({ adapter: new PrismaPg(config) });
 
-    if (!connectionString) {
-      throw new Error('DATABASE_URL is required for PrismaService');
+    if (isUnverifiedTls(config)) {
+      new Logger(PrismaService.name).warn(
+        'Database TLS is enabled but the server certificate is NOT verified. ' +
+          'Set PGSSLROOTCERT to the RDS CA bundle to enable verification.',
+      );
     }
-
-    super({
-      adapter: new PrismaPg({ connectionString }),
-    });
   }
 
   async onModuleInit() {
