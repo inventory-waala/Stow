@@ -30,6 +30,9 @@ export interface Line {
   unit: string
   barcodes: string[]
   totals: StockTotals
+  /** Catalog price, used as the default rate on a sales order line. */
+  sellPrice: string | null
+  currency: string
   /** Lower-cased haystack for the search box. */
   text: string
 }
@@ -51,6 +54,8 @@ export function flattenLines(products: ProductListItem[]): Line[] {
           unit: s.unit,
           barcodes,
           totals: s.stock_totals,
+          sellPrice: s.sell_price,
+          currency: s.currency,
           text: [p.name, p.code, v.name, s.label, s.sku, ...barcodes].filter(Boolean).join(" ").toLowerCase(),
         })
       }
