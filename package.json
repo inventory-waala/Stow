@@ -27,7 +27,9 @@
     "format": "nx format:write",
     "start:auth:dev": "nx run auth-service:start:dev",
     "start:web:dev": "nx run web:dev",
-    "start:inventory:dev": "nx run inventory-service:start:dev"
+    "start:inventory:dev": "nx run inventory-service:start:dev",
+    "start:vendor:dev": "nx run vendor-service:start:dev",
+    "start:transaction:dev": "nx run transaction-service:start:dev"
   },
   "devDependencies": {
     "nx": "22.7.12"
