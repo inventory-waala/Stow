@@ -1,0 +1,139 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum PurchaseStatus {
+  DRAFT
+  PENDING
+  ORDERED
+  APPROVED
+  RECEIVED
+  CANCELLED
+}
+
+/// How a discount figure is to be read: a percentage of the line/bill, or a
+/// flat amount in the document currency.
+enum DiscountType {
+  NONE
+  PERCENT
+  AMOUNT
+}
+
+enum SupplierStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model Supplier {
+  id         String         @id @default(cuid())
+  tenant_id  String
+  code       String?
+  name       String
+  phone      String?
+  email      String?
+  address    String?
+  state      String?
+  division   String?
+  gstin      String?
+  pan        String?
+  cin        String?
+  status     SupplierStatus @default(ACTIVE)
+  notes      String?
+  /// Tenant-defined fields, same convention as inventory-service.
+  attributes Json           @default("{}")
+  /// Service bookkeeping; never written by tenants.
+  metadata   Json           @default("{}")
+  created_at DateTime       @default(now())
+  updated_at DateTime       @updatedAt
+  deleted_at DateTime?
+
+  purchases PurchaseOrder[]
+
+  @@unique([tenant_id, code])
+  @@unique([tenant_id, gstin])
+  @@index([tenant_id, status])
+  @@index([tenant_id, name])
+  @@map("suppliers")
+}
+
+model PurchaseOrder {
+  id          String         @id @default(cuid())
+  tenant_id   String
+  supplier_id String
+  invoice_no  String
+  status      PurchaseStatus @default(DRAFT)
+  order_date  DateTime
+
+  subtotal       Decimal      @default(0) @db.Decimal(18, 4)
+  discount_type  DiscountType @default(NONE)
+  discount       Decimal      @default(0) @db.Decimal(18, 4)
+  taxable_amount Decimal      @default(0) @db.Decimal(18, 4)
+  cgst           Decimal      @default(0) @db.Decimal(18, 4)
+  sgst           Decimal      @default(0) @db.Decimal(18, 4)
+  igst           Decimal      @default(0) @db.Decimal(18, 4)
+  total_amount   Decimal      @default(0) @db.Decimal(18, 4)
+  currency       String       @default("INR")
+
+  notes   String?
+  remarks String?
+
+  /// Where received stock lands in inventory-service; null uses that tenant's
+  /// default location.
+  location_id String?
+  received_at DateTime?
+  /// Set once the IN movements have been accepted by inventory-service. Makes
+  /// receiving idempotent: a second RECEIVED transition cannot double the stock.
+  stock_posted_at DateTime?
+
+  /// auth-service user id of whoever raised the order.
+  created_by String?
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  supplier Supplier       @relation(fields: [supplier_id], references: [id], onDelete: Restrict)
+  items    PurchaseItem[]
+
+  @@unique([tenant_id, invoice_no])
+  @@index([tenant_id, status])
+  @@index([tenant_id, order_date])
+  @@index([supplier_id])
+  @@map("purchase_orders")
+}
+
+model PurchaseItem {
+  id          String @id @default(cuid())
+  tenant_id   String
+  purchase_id String
+
+  /// Loose reference to inventory-service `variant_sizes.id` — the stockable
+  /// unit. No foreign key: that table lives in another service's schema.
+  size_id String
+
+  /// Denormalised at write time. A purchase order is a historical document, so
+  /// it must still print correctly after the catalog is renamed or the size is
+  /// deleted.
+  product_name String
+  variant_name String
+  size_label   String
+  sku          String?
+
+  quantity      Decimal      @db.Decimal(18, 4)
+  unit_price    Decimal      @db.Decimal(18, 4)
+  discount_type DiscountType @default(NONE)
+  discount      Decimal      @default(0) @db.Decimal(18, 4)
+  total_price   Decimal      @db.Decimal(18, 4)
+
+  created_at DateTime @default(now())
+
+  purchase PurchaseOrder @relation(fields: [purchase_id], references: [id], onDelete: Cascade)
+
+  @@index([purchase_id])
+  @@index([tenant_id, size_id])
+  @@map("purchase_items")
+}
