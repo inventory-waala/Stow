@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Inject,
   Injectable,
   InternalServerErrorException,
@@ -18,10 +19,11 @@ import {
 } from '../../repositories/interfaces/authenticator.repository.interface';
 import { USERS_REPOSITORY } from '../../repositories/interfaces/users.repository.interface';
 import { UsersRepository } from '../../repositories/users.repository';
+import { ChallengeStore } from './challenge.store';
 
 @Injectable()
 export class PasskeyService {
-  private rpName = 'Yup Auth Service';
+  private rpName = process.env.WEBAUTHN_RP_NAME || 'Yup Auth Service';
   private rpID = process.env.WEBAUTHN_RP_ID || 'localhost';
   private origin =
     process.env.WEBAUTHN_EXPECTED_ORIGIN || 'http://localhost:3000';
@@ -31,7 +33,20 @@ export class PasskeyService {
     private readonly usersRepository: UsersRepository,
     @Inject(AUTHENTICATOR_REPOSITORY)
     private readonly authenticatorRepository: IAuthenticatorRepository,
+    private readonly challenges: ChallengeStore,
   ) {}
+
+  private static registrationKey(userId: string) {
+    return `reg:${userId}`;
+  }
+
+  private static authenticationKey(userId: string) {
+    return `auth:${userId}`;
+  }
+
+  private static transactionKey(transactionId: string, userId: string) {
+    return `txn:${transactionId}:${userId}`;
+  }
 
   /**
    * Generates options for a user registering a new Passkey
@@ -60,19 +75,29 @@ export class PasskeyService {
       },
     });
 
-    return options; // In a full implementation, this 'options.challenge' would be temporarily cached
+    this.challenges.set(
+      PasskeyService.registrationKey(user.id),
+      options.challenge,
+    );
+
+    return options;
   }
 
   /**
-   * Verifies the client's response from creating a new Passkey
+   * Verifies the response from creating a new Passkey.
    */
-  async verifyRegistration(
-    email: string,
-    response: RegistrationResponseJSON,
-    expectedChallenge: string,
-  ) {
+  async verifyRegistration(email: string, response: RegistrationResponseJSON) {
     const user = await this.usersRepository.findByEmail(email);
     if (!user) throw new UnauthorizedException('User not found');
+
+    const expectedChallenge = this.challenges.consume(
+      PasskeyService.registrationKey(user.id),
+    );
+    if (!expectedChallenge) {
+      throw new BadRequestException(
+        'Registration challenge expired or not found. Request new options.',
+      );
+    }
 
     let verification;
     try {
@@ -134,15 +159,22 @@ export class PasskeyService {
       userVerification: 'preferred',
     });
 
+    this.challenges.set(
+      PasskeyService.authenticationKey(user.id),
+      options.challenge,
+    );
+
     return options;
   }
 
   /**
-   * Verifies the client's response for passing authentication
+   * Verifies an assertion. The expected challenge is resolved from the store
+   * using the owner of the presented credential, so the caller never supplies
+   * it and a captured assertion cannot be replayed.
    */
   async verifyAuthentication(
     response: AuthenticationResponseJSON,
-    expectedChallenge: string,
+    challengeKey?: (userId: string) => string,
   ) {
     const authenticator = await this.authenticatorRepository.findByCredentialId(
       response.id,
@@ -150,6 +182,16 @@ export class PasskeyService {
 
     if (!authenticator) {
       throw new UnauthorizedException('Passkey not recognized');
+    }
+
+    const keyFor = challengeKey ?? PasskeyService.authenticationKey;
+    const expectedChallenge = this.challenges.consume(
+      keyFor(authenticator.userId),
+    );
+    if (!expectedChallenge) {
+      throw new BadRequestException(
+        'Authentication challenge expired or not found. Request new options.',
+      );
     }
 
     let verification;
@@ -210,6 +252,25 @@ export class PasskeyService {
       userVerification: 'required', // Step-up auth requires strict verification (like biometrics)
     });
 
+    this.challenges.set(
+      PasskeyService.transactionKey(transactionId, userId),
+      options.challenge,
+    );
+
     return { options, transactionId };
+  }
+
+  /**
+   * Verifies a step-up assertion against the challenge issued for this exact
+   * transaction, so an assertion obtained during a plain login cannot be used
+   * to authorise an action.
+   */
+  async verifyTransaction(
+    response: AuthenticationResponseJSON,
+    transactionId: string,
+  ) {
+    return this.verifyAuthentication(response, (userId) =>
+      PasskeyService.transactionKey(transactionId, userId),
+    );
   }
 }
