@@ -24,15 +24,32 @@ import { OrderStatus, Prisma } from '../../../generated/prisma/client';
  * Permitted status moves. CONFIRMED and FULFILLED are absent from every entry:
  * they are reached only through confirm() and fulfil(), which touch stock in
  * inventory-service and record that they did.
+ *
+ * REVIEW is the pricing gate: an order goes back and forth between PENDING and
+ * REVIEW while the special discount is agreed, and only an APPROVED order is
+ * meant to commit stock.
  */
 const TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  DRAFT: ['PENDING', 'CANCELLED'],
-  PENDING: ['DRAFT', 'CANCELLED'],
+  DRAFT: ['PENDING', 'REVIEW', 'CANCELLED'],
+  PENDING: ['DRAFT', 'REVIEW', 'CANCELLED'],
+  REVIEW: ['PENDING', 'APPROVED', 'CANCELLED'],
+  APPROVED: ['REVIEW', 'CANCELLED'],
   CONFIRMED: ['CANCELLED'],
   FULFILLED: ['RETURNED'],
   CANCELLED: [],
   RETURNED: [],
-};
+}
+
+/**
+ * Stock may be reserved from any stage before it has shipped. Reserving locks
+ * the lines, so in practice this is done once the figures are agreed — an
+ * order in REVIEW that has reserved stock cannot have its discount changed
+ * until the reservation is released.
+ */
+const CONFIRMABLE: OrderStatus[] = ['DRAFT', 'PENDING', 'REVIEW', 'APPROVED']
+
+/** An approved order may ship directly without a separate reservation step. */
+const FULFILLABLE: OrderStatus[] = ['CONFIRMED', 'APPROVED', 'PENDING'];
 
 const ORDER_INCLUDE = {
   customer: true,
@@ -306,7 +323,7 @@ export class OrdersService {
     if (existing.reserved_at) {
       throw new ConflictException('This order has already reserved its stock');
     }
-    if (existing.status !== 'DRAFT' && existing.status !== 'PENDING') {
+    if (!CONFIRMABLE.includes(existing.status)) {
       throw new ConflictException(`Cannot confirm a ${existing.status} order`);
     }
     if (existing.items.length === 0) {
@@ -354,7 +371,7 @@ export class OrdersService {
         `Stock for this order was already posted at ${existing.stock_posted_at.toISOString()}`,
       );
     }
-    if (existing.status !== 'CONFIRMED' && existing.status !== 'PENDING') {
+    if (!FULFILLABLE.includes(existing.status)) {
       throw new ConflictException(`Cannot fulfil a ${existing.status} order`);
     }
     if (existing.items.length === 0) {

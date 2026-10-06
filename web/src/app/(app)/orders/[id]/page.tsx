@@ -16,6 +16,8 @@ import {
 import { fmtMoney, fmtQty, Panel, ServiceNotice } from "@/components/inventory/primitives"
 import { StatusBadge } from "@/components/commerce/status-badge"
 import { OrderStatusActions, StockActions } from "@/components/orders/order-actions"
+import { RepriceBox } from "@/components/orders/reprice-box"
+import { IS_REPRICEABLE } from "@/lib/orders/types"
 
 export async function generateMetadata({ params }: PageProps<"/orders/[id]">) {
   const { id } = await params
@@ -142,6 +144,19 @@ export default async function OrderPage({ params }: PageProps<"/orders/[id]">) {
         </Panel>
 
         <div className="space-y-4">
+          {/* Pricing comes before stock in the workflow, so it comes first on
+              the page while the order is still open to it. */}
+          {IS_REPRICEABLE.includes(o.status) && !o.reserved_at ? (
+            <Panel
+              title="Review figures"
+              description="Settle discounts and tax before approving"
+            >
+              <div className="px-5 pb-5">
+                <RepriceBox order={o} />
+              </div>
+            </Panel>
+          ) : null}
+
           <Panel title="Stock">
             <div className="px-5 pb-5">
               <StockActions order={o} locations={locations.ok ? locations.data : []} />

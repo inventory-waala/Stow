@@ -3,6 +3,8 @@ export type DiscountType = "NONE" | "PERCENT" | "AMOUNT"
 export type OrderStatus =
   | "DRAFT"
   | "PENDING"
+  | "REVIEW"
+  | "APPROVED"
   | "CONFIRMED"
   | "FULFILLED"
   | "CANCELLED"
@@ -74,6 +76,8 @@ export interface Order {
 export const ORDER_STATUSES: OrderStatus[] = [
   "DRAFT",
   "PENDING",
+  "REVIEW",
+  "APPROVED",
   "CONFIRMED",
   "FULFILLED",
   "CANCELLED",
@@ -84,16 +88,30 @@ export const ORDER_STATUSES: OrderStatus[] = [
  * Statuses a user may set directly. CONFIRMED, FULFILLED and a cancellation
  * that must release a reservation all go through their own actions, because
  * they touch stock.
+ *
+ * REVIEW is the pricing gate: an order moves between PENDING and REVIEW while
+ * the special discount is agreed, then on to APPROVED.
  */
 export const SETTABLE_STATUSES: Record<OrderStatus, OrderStatus[]> = {
-  DRAFT: ["PENDING"],
-  PENDING: ["DRAFT"],
+  DRAFT: ["PENDING", "REVIEW"],
+  PENDING: ["DRAFT", "REVIEW"],
+  REVIEW: ["PENDING", "APPROVED"],
+  APPROVED: ["REVIEW"],
   CONFIRMED: [],
   FULFILLED: ["RETURNED"],
   CANCELLED: [],
   RETURNED: [],
 }
 
-export const CONFIRMABLE: OrderStatus[] = ["DRAFT", "PENDING"]
-export const FULFILLABLE: OrderStatus[] = ["CONFIRMED", "PENDING"]
-export const CANCELLABLE: OrderStatus[] = ["DRAFT", "PENDING", "CONFIRMED"]
+export const CONFIRMABLE: OrderStatus[] = ["DRAFT", "PENDING", "REVIEW", "APPROVED"]
+export const FULFILLABLE: OrderStatus[] = ["CONFIRMED", "APPROVED", "PENDING"]
+export const CANCELLABLE: OrderStatus[] = [
+  "DRAFT",
+  "PENDING",
+  "REVIEW",
+  "APPROVED",
+  "CONFIRMED",
+]
+
+/** The stage where the special discount is meant to be settled. */
+export const IS_REPRICEABLE: OrderStatus[] = ["DRAFT", "PENDING", "REVIEW"]

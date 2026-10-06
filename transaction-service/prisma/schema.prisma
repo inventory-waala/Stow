@@ -7,11 +7,18 @@ datasource db {
   provider = "postgresql"
 }
 
-/// Lifecycle of a sales order. CONFIRMED reserves stock in inventory-service,
-/// FULFILLED converts the reservation into an OUT movement.
+/// Lifecycle of a sales order.
+///
+/// DRAFT/PENDING are the order as raised. REVIEW is the pricing gate, where
+/// the special discount is settled before anyone commits to the figures, and
+/// APPROVED is the sanctioned document. Only then does stock get involved:
+/// CONFIRMED reserves it in inventory-service and FULFILLED converts the
+/// reservation into an OUT movement.
 enum OrderStatus {
   DRAFT
   PENDING
+  REVIEW
+  APPROVED
   CONFIRMED
   FULFILLED
   CANCELLED

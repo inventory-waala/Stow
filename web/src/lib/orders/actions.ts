@@ -220,6 +220,60 @@ export async function createOrder(
   }
 }
 
+/**
+ * Settles the figures during the REVIEW stage: the special discount, the bill
+ * discount and the tax rates. The service recomputes every total from the
+ * lines, so this only sends the inputs.
+ *
+ * Refused once stock is reserved — the lines are what was held — which is why
+ * repricing is meant to happen before the order is confirmed.
+ */
+export async function repriceOrder(
+  _prev: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const id = String(formData.get("id") ?? "")
+  if (!id) return { error: "Missing order" }
+
+  const parsed = z
+    .object({
+      discount: z
+        .string()
+        .trim()
+        .optional()
+        .transform((v) => v || undefined),
+      special_discount: z
+        .string()
+        .trim()
+        .optional()
+        .transform((v) => v || undefined),
+      cgst_rate: rate,
+      sgst_rate: rate,
+      igst_rate: rate,
+    })
+    .safeParse(Object.fromEntries(formData))
+  if (!parsed.success) return firstIssue(parsed.error)
+
+  const discountType = asDiscount(formData.get("discount_type"))
+  const specialType = asDiscount(formData.get("special_discount_type"))
+
+  try {
+    const token = await requireToken()
+    await transactionApi.updateOrder(token, id, {
+      ...parsed.data,
+      discount_type: discountType,
+      ...(discountType === "NONE" ? { discount: "0" } : {}),
+      special_discount_type: specialType,
+      ...(specialType === "NONE" ? { special_discount: "0" } : {}),
+    })
+    revalidatePath("/orders")
+    revalidatePath(`/orders/${id}`)
+    return { success: "Figures updated" }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
 export async function setOrderStatus(
   _prev: ActionState,
   formData: FormData

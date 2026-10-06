@@ -9,6 +9,7 @@ const TONE: Record<string, string> = {
   DRAFT: "bg-secondary text-muted-foreground",
   PENDING: "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300",
   ORDERED: "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300",
+  REVIEW: "bg-violet-100 text-violet-800 dark:bg-violet-950/50 dark:text-violet-300",
   APPROVED: "bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-300",
   CONFIRMED: "bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-300",
   RECEIVED: "bg-brand-soft text-brand",
