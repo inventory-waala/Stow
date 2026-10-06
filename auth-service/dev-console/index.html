@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Auth Service Console</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="data:,">
+</head>
+<body>
+
+<header>
+  <h1>Auth Service Console</h1>
+  <div class="spacer"></div>
+  <div class="field" style="margin:0;min-width:230px">
+    <input id="baseUrl" value="/api" aria-label="Auth service base URL">
+  </div>
+  <span id="health" class="status"><span class="dot"></span><span id="healthText">checking…</span></span>
+</header>
+
+<main>
+  <!-- ============ left: flows ============ -->
+  <div>
+    <div class="tabs" role="tablist">
+      <button role="tab" aria-selected="true" data-tab="account">Account</button>
+      <button role="tab" aria-selected="false" data-tab="tenants">Tenants</button>
+      <button role="tab" aria-selected="false" data-tab="rbac">RBAC</button>
+      <button role="tab" aria-selected="false" data-tab="passkeys">Passkeys</button>
+    </div>
+
+    <!-- ---------- account ---------- -->
+    <section data-panel="account">
+      <div class="card">
+        <h2>1 · Register</h2>
+        <p class="hint">Creates the user as <code>PENDING_VERIFICATION</code> and auto-provisions a tenant with you as <code>owner</code>.</p>
+        <div class="row">
+          <div class="field"><label for="regEmail">Email</label><input id="regEmail" type="email" value="test@example.com"></div>
+          <div class="field"><label for="regPassword">Password</label><input id="regPassword" type="text" value="Password@123"></div>
+          <div class="field"><label for="regName">Name</label><input id="regName" value="Test User"></div>
+        </div>
+        <div class="actions"><button data-act="register">Register</button></div>
+      </div>
+
+      <div class="card">
+        <h2>2 · Verify email</h2>
+        <p class="hint">Auto-filled from the register response — the token is returned directly until email sending moves to Kafka. Login is blocked until this succeeds.</p>
+        <div class="field"><label for="verifyToken">Verification token</label><input id="verifyToken" placeholder="register first, or paste a token"></div>
+        <div class="actions"><button data-act="verify">Verify email</button></div>
+      </div>
+
+      <div class="card">
+        <h2>3 · Login</h2>
+        <p class="hint">Leave tenant blank to fall back to your first tenant membership.</p>
+        <div class="row">
+          <div class="field"><label for="loginEmail">Email</label><input id="loginEmail" type="email" value="test@example.com"></div>
+          <div class="field"><label for="loginPassword">Password</label><input id="loginPassword" type="text" value="Password@123"></div>
+          <div class="field"><label for="loginTenant">Tenant ID (optional)</label><input id="loginTenant" placeholder="auto"></div>
+        </div>
+        <div class="actions">
+          <button data-act="login">Login</button>
+          <button class="secondary" data-act="me">GET /auth/me</button>
+          <button class="secondary" data-act="refresh">Refresh token</button>
+          <button class="secondary" data-act="logout">Logout</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>4 · Password reset</h2>
+        <p class="hint">The reset token comes back in the response for now. The message is identical for unknown emails, by design.</p>
+        <div class="row">
+          <div class="field"><label for="forgotEmail">Email</label><input id="forgotEmail" type="email" value="test@example.com"></div>
+          <div class="field"><label for="resetToken">Reset token</label><input id="resetToken" placeholder="from forgot-password"></div>
+          <div class="field"><label for="newPassword">New password</label><input id="newPassword" type="text" value="NewPassword@456"></div>
+        </div>
+        <div class="actions">
+          <button data-act="forgot">Forgot password</button>
+          <button class="secondary" data-act="reset">Reset password</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- tenants ---------- -->
+    <section data-panel="tenants" hidden>
+      <div class="card">
+        <h2>Your tenants</h2>
+        <p class="hint">Membership lives in <code>user_roles</code>. Creating a tenant makes you its owner.</p>
+        <div class="actions"><button data-act="myTenants">GET /tenants/me</button></div>
+        <div id="tenantList" style="margin-top:12px"></div>
+      </div>
+
+      <div class="card">
+        <h2>Create tenant</h2>
+        <div class="row">
+          <div class="field"><label for="tenantName">Name</label><input id="tenantName" value="Acme Corp"></div>
+          <div class="field"><label for="tenantDesc">Description</label><input id="tenantDesc" value="Second tenant"></div>
+        </div>
+        <div class="actions"><button data-act="createTenant">Create tenant</button></div>
+      </div>
+
+      <div class="card">
+        <h2>Switch tenant</h2>
+        <p class="hint">Issues a new access token scoped to that tenant. Role administration always acts inside the tenant your current token was issued for.</p>
+        <div class="field"><label for="switchTenantId">Tenant ID</label><input id="switchTenantId" placeholder="tenant id"></div>
+        <div class="actions"><button data-act="switchTenant">Switch</button></div>
+      </div>
+    </section>
+
+    <!-- ---------- rbac ---------- -->
+    <section data-panel="rbac" hidden>
+      <div class="banner warn">
+        These four routes require the <code>owner</code> or <code>admin</code> role <em>in your current tenant</em>. A token for tenant A cannot touch tenant B — that returns <code>403</code>.
+      </div>
+
+      <div class="card">
+        <h2>Create role</h2>
+        <div class="row">
+          <div class="field"><label for="roleTenant">Tenant ID</label><input id="roleTenant" placeholder="must match your token"></div>
+          <div class="field"><label for="roleName">Role name</label><input id="roleName" value="manager"></div>
+          <div class="field"><label for="roleDesc">Description</label><input id="roleDesc" value="Day-to-day operations"></div>
+        </div>
+        <div class="actions"><button data-act="createRole">Create role</button></div>
+      </div>
+
+      <div class="card">
+        <h2>Assign permissions to role</h2>
+        <div class="row">
+          <div class="field"><label for="permRoleId">Role ID</label><input id="permRoleId" placeholder="from create role"></div>
+          <div class="field"><label for="permList">Permissions (comma separated)</label><input id="permList" value="inventory.read, inventory.write, order.create"></div>
+        </div>
+        <div class="actions"><button data-act="assignPerms">Assign permissions</button></div>
+      </div>
+
+      <div class="card">
+        <h2>Assign / revoke role</h2>
+        <div class="row">
+          <div class="field"><label for="assignUserId">User ID</label><input id="assignUserId" placeholder="your user id"></div>
+          <div class="field"><label for="assignRoleId">Role ID</label><input id="assignRoleId"></div>
+          <div class="field"><label for="assignTenantId">Tenant ID</label><input id="assignTenantId"></div>
+        </div>
+        <div class="actions">
+          <button data-act="assignRole">Assign role</button>
+          <button class="secondary" data-act="revokeRole">Revoke role</button>
+        </div>
+        <p class="hint" style="margin:12px 0 0">After assigning, log in again (or switch tenant) to see the new role and permissions in the token.</p>
+      </div>
+    </section>
+
+    <!-- ---------- passkeys ---------- -->
+    <section data-panel="passkeys" hidden>
+      <div class="banner ok">
+        This page is served from <code>http://localhost:3000</code> so it matches <code>WEBAUTHN_EXPECTED_ORIGIN</code> and <code>WEBAUTHN_RP_ID=localhost</code>. The challenge is held server-side and is single use, so nothing is sent from here.
+      </div>
+
+      <div class="card">
+        <h2>Register a passkey</h2>
+        <p class="hint">Uses your platform authenticator (Windows Hello, Touch ID, phone).</p>
+        <div class="field"><label for="pkEmail">Email</label><input id="pkEmail" type="email" value="test@example.com"></div>
+        <div class="actions">
+          <button data-act="pkRegister">Register passkey</button>
+          <button class="secondary" data-act="pkAuth">Authenticate with passkey</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Step-up for an action</h2>
+        <p class="hint">The challenge is bound to this exact transaction ID, so an assertion from a normal login cannot authorise it.</p>
+        <div class="row">
+          <div class="field"><label for="pkUserId">User ID</label><input id="pkUserId" placeholder="your user id"></div>
+          <div class="field"><label for="pkTxnId">Transaction ID</label><input id="pkTxnId" value="order-42"></div>
+        </div>
+        <div class="actions"><button data-act="pkStepUp">Verify step-up</button></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============ right: session + log ============ -->
+  <div class="log-panel">
+    <div class="card">
+      <h2>Session</h2>
+      <div id="sessionBody"><p class="empty">Not signed in.</p></div>
+      <div class="actions" style="margin-top:12px">
+        <button class="secondary" data-act="clearSession">Clear session</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Requests</h2>
+      <p class="hint">Newest first. Click any row to expand.</p>
+      <div id="log"><p class="empty">No requests yet.</p></div>
+      <div class="actions"><button class="secondary" data-act="clearLog">Clear log</button></div>
+    </div>
+  </div>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>
