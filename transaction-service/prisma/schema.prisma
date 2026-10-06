@@ -1,0 +1,138 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// Lifecycle of a sales order. CONFIRMED reserves stock in inventory-service,
+/// FULFILLED converts the reservation into an OUT movement.
+enum OrderStatus {
+  DRAFT
+  PENDING
+  CONFIRMED
+  FULFILLED
+  CANCELLED
+  RETURNED
+}
+
+enum DiscountType {
+  NONE
+  PERCENT
+  AMOUNT
+}
+
+enum CustomerStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model Customer {
+  id         String         @id @default(cuid())
+  tenant_id  String
+  code       String?
+  name       String
+  phone      String?
+  email      String?
+  address    String?
+  state      String?
+  gstin      String?
+  pan        String?
+  status     CustomerStatus @default(ACTIVE)
+  notes      String?
+  attributes Json           @default("{}")
+  metadata   Json           @default("{}")
+  created_at DateTime       @default(now())
+  updated_at DateTime       @updatedAt
+  deleted_at DateTime?
+
+  orders Order[]
+
+  @@unique([tenant_id, code])
+  @@index([tenant_id, status])
+  @@index([tenant_id, name])
+  @@index([tenant_id, phone])
+  @@map("customers")
+}
+
+model Order {
+  id          String      @id @default(cuid())
+  tenant_id   String
+  customer_id String
+  invoice_no  String
+  status      OrderStatus @default(DRAFT)
+  order_date  DateTime
+
+  subtotal      Decimal      @default(0) @db.Decimal(18, 4)
+  discount_type DiscountType @default(NONE)
+  discount      Decimal      @default(0) @db.Decimal(18, 4)
+  /// A second discount applied after the bill discount, settled at review time.
+  special_discount_type DiscountType @default(NONE)
+  special_discount      Decimal      @default(0) @db.Decimal(18, 4)
+  taxable_amount        Decimal      @default(0) @db.Decimal(18, 4)
+  cgst                  Decimal      @default(0) @db.Decimal(18, 4)
+  sgst                  Decimal      @default(0) @db.Decimal(18, 4)
+  igst                  Decimal      @default(0) @db.Decimal(18, 4)
+  total_amount          Decimal      @default(0) @db.Decimal(18, 4)
+  currency              String       @default("INR")
+
+  notes   String?
+  remarks String?
+
+  /// Which inventory location the goods leave from; null uses the tenant default.
+  location_id String?
+  /// Set once stock has been reserved against this order.
+  reserved_at DateTime?
+  /// Set once the OUT movements have been accepted by inventory-service. Makes
+  /// fulfilment idempotent.
+  stock_posted_at DateTime?
+  fulfilled_at    DateTime?
+
+  /// auth-service user id of whoever raised the order.
+  created_by String?
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  customer Customer    @relation(fields: [customer_id], references: [id], onDelete: Restrict)
+  items    OrderItem[]
+
+  @@unique([tenant_id, invoice_no])
+  @@index([tenant_id, status])
+  @@index([tenant_id, order_date])
+  @@index([customer_id])
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String @id @default(cuid())
+  tenant_id String
+  order_id  String
+
+  /// Loose reference to inventory-service `variant_sizes.id`. No foreign key:
+  /// that table lives in another service's schema.
+  size_id String
+
+  /// Denormalised at write time so an invoice still prints correctly after the
+  /// catalog is renamed.
+  product_name String
+  variant_name String
+  size_label   String
+  sku          String?
+
+  quantity      Decimal      @db.Decimal(18, 4)
+  rate          Decimal      @db.Decimal(18, 4)
+  discount_type DiscountType @default(NONE)
+  discount      Decimal      @default(0) @db.Decimal(18, 4)
+  total         Decimal      @db.Decimal(18, 4)
+
+  created_at DateTime @default(now())
+
+  order Order @relation(fields: [order_id], references: [id], onDelete: Cascade)
+
+  @@index([order_id])
+  @@index([tenant_id, size_id])
+  @@map("order_items")
+}
