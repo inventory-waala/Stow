@@ -80,7 +80,7 @@ export default async function PurchasesPage({ searchParams }: PageProps<"/purcha
       {suppliers.ok && !suppliers.data.items.length ? (
         <p className="text-sm text-muted-foreground">
           Add a supplier first — a purchase order always has one.{" "}
-          <Link href="/purchases/suppliers" className="underline underline-offset-4">
+          <Link href="/suppliers" className="underline underline-offset-4">
             Manage suppliers
           </Link>
           .

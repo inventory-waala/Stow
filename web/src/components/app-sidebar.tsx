@@ -10,6 +10,7 @@ import {
   LayoutDashboardIcon,
   ReceiptIcon,
   Settings2Icon,
+  TruckIcon,
   UsersIcon,
 } from "lucide-react"
 
@@ -26,13 +27,14 @@ import {
   SidebarHeader,
 } from "@/components/ui/sidebar"
 
-// Route map carried over from the previous app. Dashboard, Inventory,
-// Purchases, Orders and Customers are live; Team and Reports are still
+// Route map carried over from the previous app. Buy side (Purchases,
+// Suppliers) then sell side (Orders, Customers); Team and Reports are still
 // placeholders waiting on their services.
 const navMain = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboardIcon },
   { title: "Inventory", url: "/inventory", icon: ArchiveIcon },
   { title: "Purchases", url: "/purchases", icon: ClipboardListIcon },
+  { title: "Suppliers", url: "/suppliers", icon: TruckIcon },
   { title: "Orders", url: "/orders", icon: ReceiptIcon },
   { title: "Customers", url: "/customers", icon: BriefcaseIcon },
   { title: "Team", url: "/team", icon: UsersIcon },

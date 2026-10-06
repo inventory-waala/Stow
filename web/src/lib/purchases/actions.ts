@@ -68,7 +68,7 @@ export async function createSupplier(
   try {
     const token = await requireToken()
     const supplier = await vendorApi.createSupplier(token, parsed.data)
-    revalidatePath("/purchases/suppliers")
+    revalidatePath("/suppliers")
     revalidatePath("/purchases")
     return { success: `Added ${supplier.name}`, id: supplier.id }
   } catch (err) {
@@ -87,7 +87,7 @@ export async function updateSupplier(
   try {
     const token = await requireToken()
     await vendorApi.updateSupplier(token, id, parsed.data)
-    revalidatePath("/purchases/suppliers")
+    revalidatePath("/suppliers")
     return { success: "Saved" }
   } catch (err) {
     return fail(err)
@@ -103,7 +103,7 @@ export async function deleteSupplier(
   try {
     const token = await requireToken()
     await vendorApi.deleteSupplier(token, id)
-    revalidatePath("/purchases/suppliers")
+    revalidatePath("/suppliers")
     return { success: "Supplier removed" }
   } catch (err) {
     return fail(err)
