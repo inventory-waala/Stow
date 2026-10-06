@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
-const keysDir = path.join(__dirname, '..', 'keys');
+const keysDir = path.join(__dirname, '..', '..', 'keys');
 
 // Ensure directory exists
 if (!fs.existsSync(keysDir)) {
