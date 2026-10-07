@@ -3,6 +3,11 @@ export interface CreateTenantDto {
   description?: string;
 }
 
+export interface UpdateTenantDto {
+  name?: string;
+  description?: string;
+}
+
 export interface TenantProfileDto {
   id: string;
   name: string;

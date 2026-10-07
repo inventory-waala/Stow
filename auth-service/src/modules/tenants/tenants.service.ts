@@ -1,7 +1,17 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
-import { CreateTenantDto, TenantProfileDto } from './dto/tenants.dto';
+import {
+  CreateTenantDto,
+  TenantProfileDto,
+  UpdateTenantDto,
+} from './dto/tenants.dto';
 
 @Injectable()
 export class TenantsService {
@@ -27,6 +37,54 @@ export class TenantsService {
     await this.provisionOwner(tenant.id, userId);
 
     return tenant;
+  }
+
+  /**
+   * Renames or re-describes a tenant the caller already belongs to.
+   *
+   * `tenantId` comes from the caller's token, never the body, so there is no
+   * way to edit a workspace you are not currently in. Membership is still
+   * re-checked against user_roles: a token outlives a revoked role.
+   */
+  async update(
+    userId: string,
+    tenantId: string,
+    data: UpdateTenantDto,
+  ): Promise<TenantProfileDto> {
+    const membership = await this.prisma.userRole.findFirst({
+      where: { user_id: userId, tenant_id: tenantId },
+      select: { tenant_id: true },
+    });
+    if (!membership) {
+      throw new ForbiddenException('You do not belong to this workspace');
+    }
+
+    const patch: UpdateTenantDto = {};
+    if (data.name !== undefined) patch.name = data.name.trim();
+    if (data.description !== undefined) {
+      patch.description = data.description.trim();
+    }
+    if (patch.name === '') {
+      throw new BadRequestException('Workspace name cannot be empty');
+    }
+
+    try {
+      return await this.prisma.tenant.update({
+        where: { id: tenantId },
+        data: patch,
+      });
+    } catch (error: any) {
+      // Tenant.name is uniquely indexed (see the init migration).
+      if (error?.code === 'P2002') {
+        throw new ConflictException(
+          'Another workspace already uses that name.',
+        );
+      }
+      if (error?.code === 'P2025') {
+        throw new NotFoundException('Workspace not found');
+      }
+      throw error;
+    }
   }
 
   async findUserTenants(userId: string): Promise<TenantProfileDto[]> {
