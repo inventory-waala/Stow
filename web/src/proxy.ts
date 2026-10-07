@@ -9,6 +9,9 @@ import {
 } from "@/lib/auth/config"
 import { decodeAccessToken, isExpired } from "@/lib/auth/jwt"
 
+/** The only route a signed-in user without a workspace may reach. */
+const NEW_WORKSPACE_PATH = "/workspace/new"
+
 /**
  * Runs before every page request:
  *  - silently refreshes an expired access token using the refresh cookie
@@ -35,8 +38,13 @@ export async function proxy(request: NextRequest) {
     const refreshed = await tryRefresh(claims.id, refreshToken, claims.tenant_id)
     if (refreshed) {
       authenticated = true
-      const response = isAuthPage
-        ? NextResponse.redirect(new URL("/dashboard", request.url))
+      const next = destinationFor(
+        request,
+        decodeAccessToken(refreshed.accessToken),
+        isAuthPage
+      )
+      const response = next
+        ? NextResponse.redirect(new URL(next, request.url))
         : NextResponse.next()
       setCookie(response, COOKIE.access, refreshed.accessToken)
       if (refreshed.refreshToken) {
@@ -47,8 +55,9 @@ export async function proxy(request: NextRequest) {
   }
 
   if (authenticated) {
-    return isAuthPage
-      ? NextResponse.redirect(new URL("/dashboard", request.url))
+    const next = destinationFor(request, claims, isAuthPage)
+    return next
+      ? NextResponse.redirect(new URL(next, request.url))
       : NextResponse.next()
   }
 
@@ -66,6 +75,33 @@ export async function proxy(request: NextRequest) {
     response.cookies.delete(COOKIE.refresh)
   }
   return response
+}
+
+/**
+ * Where a signed-in request should actually go, or null to let it through.
+ *
+ * Registration no longer creates a workspace, so a fresh account has no
+ * tenant_id on its token. Until it has one it cannot read or write anything —
+ * every service scopes by tenant — so it is held at the create-workspace
+ * screen rather than being shown an app full of empty states and 403s.
+ */
+function destinationFor(
+  request: NextRequest,
+  claims: ReturnType<typeof decodeAccessToken>,
+  isAuthPage: boolean
+): string | null {
+  const { pathname } = request.nextUrl
+  if (!claims?.tenant_id) {
+    // The marketing and legal pages belong to everyone; it is the app that
+    // needs a workspace.
+    if (pathname === NEW_WORKSPACE_PATH || PUBLIC_PATHS.includes(pathname)) {
+      return null
+    }
+    return NEW_WORKSPACE_PATH
+  }
+  // Someone with a workspace has no business on the create screen unless they
+  // asked for it; only the signed-out pages bounce them to the dashboard.
+  return isAuthPage ? "/dashboard" : null
 }
 
 async function tryRefresh(userId: string, token: string, tenantId?: string) {

@@ -10,18 +10,24 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 
-export function WorkspaceForm() {
+/**
+ * `canCancel` is false on first run: a signed-in account with no workspace is
+ * held here by the proxy, so a Back link would bounce straight back and the
+ * copy has to read as a required step rather than an optional extra.
+ */
+export function WorkspaceForm({ canCancel = true }: { canCancel?: boolean }) {
   const [state, action, pending] = useActionState(createTenantAction, undefined)
 
   return (
     <div className="mx-auto max-w-xl py-6 lg:py-12">
       <div className="mb-10">
         <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-          Create a workspace
+          {canCancel ? "Create a workspace" : "Set up your workspace"}
         </h1>
         <p className="mt-3 max-w-[50ch] text-muted-foreground">
-          One workspace per company. You become its owner and can invite the team
-          afterwards.
+          {canCancel
+            ? "One workspace per company. You become its owner and can invite the team afterwards."
+            : "One workspace per company. Name yours to get started — you become its owner and can invite the team afterwards."}
         </p>
       </div>
 
@@ -65,12 +71,16 @@ export function WorkspaceForm() {
           </div>
 
           <div className="flex items-center justify-between gap-3 pt-2">
-            <Link
-              href="/settings/workspace"
-              className="text-sm text-muted-foreground underline-offset-4 hover:underline"
-            >
-              Back
-            </Link>
+            {canCancel ? (
+              <Link
+                href="/settings/workspace"
+                className="text-sm text-muted-foreground underline-offset-4 hover:underline"
+              >
+                Back
+              </Link>
+            ) : (
+              <span />
+            )}
             <Button
               type="submit"
               disabled={pending}
