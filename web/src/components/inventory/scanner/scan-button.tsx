@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { CameraIcon, KeyboardIcon } from "lucide-react"
+import { KeyboardIcon, ScanBarcodeIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -10,7 +10,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { CameraScanner } from "./camera-scanner"
 
 /**
- * A camera button that sits next to any "scan or type" input. Opens the
+ * A scan button that sits next to any "scan or type" input. Opens the
  * viewfinder, reads one code, hands it back and closes — so every field
  * that accepts a barcode also accepts a phone camera.
  */
@@ -29,7 +29,7 @@ export function ScanButton({
   size?: "icon" | "icon-sm" | "icon-xs" | "icon-lg" | "sm" | "default"
   className?: string
   disabled?: boolean
-  /** Button content; defaults to the camera icon alone. */
+  /** Button content; defaults to the barcode icon alone. */
   children?: React.ReactNode
 }) {
   const [open, setOpen] = useState(false)
@@ -54,7 +54,7 @@ export function ScanButton({
             title={title}
             className={cn("shrink-0", className)}
           >
-            {children ?? <CameraIcon />}
+            {children ?? <ScanBarcodeIcon />}
           </Button>
         }
       />
