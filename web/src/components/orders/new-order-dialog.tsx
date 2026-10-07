@@ -1,6 +1,6 @@
 "use client"
 
-import { useActionState, useState } from "react"
+import { useActionState, useCallback, useRef, useState } from "react"
 import Link from "next/link"
 import { CheckCircle2Icon, PlusIcon } from "lucide-react"
 
@@ -24,6 +24,15 @@ import { FormAlert } from "@/components/inventory/primitives"
 import { SelectField } from "@/components/inventory/select-field"
 import { flattenLines } from "@/components/inventory/quick-stock-sheet"
 import { LineItemsEditor } from "@/components/commerce/line-items"
+import {
+  ActionRail,
+  ShortcutHelp,
+  ShortcutHint,
+  useEnterAdvances,
+  useShortcutHelp,
+  useVoucherKeys,
+  type VoucherAction,
+} from "@/components/commerce/voucher"
 
 function CreatedNotice({ state, onDismiss }: { state: ActionState; onDismiss: () => void }) {
   if (!state?.success || !state.id) return null
@@ -70,6 +79,13 @@ export function NewOrderDialog({
   const [session, setSession] = useState(0)
   const [state, action, pending] = useActionState(createOrder, undefined)
   const [dismissed, setDismissed] = useState(false)
+  const [lineCount, setLineCount] = useState(0)
+
+  const formRef = useRef<HTMLFormElement>(null)
+  const searchRef = useRef<HTMLInputElement>(null)
+  const help = useShortcutHelp()
+  const advance = useEnterAdvances()
+  const onCountChange = useCallback((n: number) => setLineCount(n), [])
 
   const lines = flattenLines(products)
   const customerOptions = customers
@@ -79,6 +95,41 @@ export function NewOrderDialog({
     { value: "", label: "Default location" },
     ...locations.map((l) => ({ value: l.id, label: l.name })),
   ]
+
+  /** Same key map as the purchase voucher, so the muscle memory carries. */
+  const actions: VoucherAction[] = [
+    {
+      keys: "mod+s",
+      label: pending ? "Saving…" : "Save invoice",
+      hint: "Posts the order. Stock is only held when you confirm it.",
+      primary: true,
+      disabled: pending || lineCount === 0,
+      run: () => formRef.current?.requestSubmit(),
+    },
+    {
+      keys: "alt+l",
+      label: "Add a line",
+      hint: "Jumps to the product search",
+      disabled: pending,
+      run: () => searchRef.current?.focus(),
+    },
+    {
+      keys: "alt+c",
+      label: "Customer",
+      hint: "Jumps back to the customer field",
+      disabled: pending,
+      run: () => document.getElementById("customer_id")?.focus(),
+    },
+    { keys: "?", label: "Keys", hint: "This list", run: help.show },
+    {
+      keys: "escape",
+      label: "Close",
+      hidden: true,
+      run: () => (help.open ? help.hide() : setOpen(false)),
+    },
+  ]
+
+  useVoucherKeys(actions, open)
 
   const created = state?.success && state.id && !dismissed ? state : undefined
 
@@ -101,17 +152,27 @@ export function NewOrderDialog({
           </Button>
         }
       />
-      <DialogContent className="max-h-[85svh] overflow-y-auto sm:max-w-3xl">
+      <DialogContent className="relative max-h-[85svh] overflow-y-auto sm:max-w-5xl">
+        <ShortcutHelp actions={actions} open={help.open} onClose={help.hide} />
+
         <DialogHeader>
           <DialogTitle>New order</DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="flex flex-wrap items-center gap-x-3 gap-y-1">
             Build the invoice. Stock is only held when you confirm it.
+            <ShortcutHint onOpen={help.show} />
           </DialogDescription>
         </DialogHeader>
 
         <CreatedNotice state={created} onDismiss={() => setDismissed(true)} />
 
-        <form key={session} action={action} className="space-y-5">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_11rem]">
+        <form
+          key={session}
+          ref={formRef}
+          action={action}
+          onKeyDown={advance}
+          className="space-y-5"
+        >
           {state?.error ? <FormAlert state={state} /> : null}
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -154,6 +215,8 @@ export function NewOrderDialog({
               lines={lines}
               priceField="rate"
               priceLabel="Rate"
+              searchRef={searchRef}
+              onCountChange={onCountChange}
             />
             <p className="text-xs text-muted-foreground">
               Leave a rate blank to use the catalog sell price.
@@ -166,11 +229,21 @@ export function NewOrderDialog({
           </div>
 
           <DialogFooter>
-            <Button type="submit" disabled={pending} className="rounded-full">
+            <Button
+              type="submit"
+              disabled={pending || lineCount === 0}
+              className="rounded-full"
+            >
               {pending ? "Saving…" : "Save order"}
             </Button>
           </DialogFooter>
         </form>
+
+        <ActionRail
+          actions={actions}
+          className="lg:sticky lg:top-0 lg:h-fit lg:border-l lg:border-border/70 lg:pl-3"
+        />
+        </div>
       </DialogContent>
     </Dialog>
   )

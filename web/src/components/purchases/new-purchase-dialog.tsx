@@ -1,6 +1,6 @@
 "use client"
 
-import { useActionState, useState } from "react"
+import { useActionState, useCallback, useRef, useState } from "react"
 import Link from "next/link"
 import { CheckCircle2Icon, PlusIcon } from "lucide-react"
 
@@ -24,6 +24,15 @@ import { FormAlert } from "@/components/inventory/primitives"
 import { SelectField } from "@/components/inventory/select-field"
 import { flattenLines } from "@/components/inventory/quick-stock-sheet"
 import { LineItemsEditor } from "@/components/commerce/line-items"
+import {
+  ActionRail,
+  ShortcutHelp,
+  ShortcutHint,
+  useEnterAdvances,
+  useShortcutHelp,
+  useVoucherKeys,
+  type VoucherAction,
+} from "@/components/commerce/voucher"
 
 function CreatedNotice({ state, onDismiss }: { state: ActionState; onDismiss: () => void }) {
   if (!state?.success || !state.id) return null
@@ -77,6 +86,55 @@ export function NewPurchaseDialog({
   const [session, setSession] = useState(0)
   const [state, action, pending] = useActionState(createPurchase, undefined)
   const [dismissed, setDismissed] = useState(false)
+  const [lineCount, setLineCount] = useState(0)
+
+  const formRef = useRef<HTMLFormElement>(null)
+  const searchRef = useRef<HTMLInputElement>(null)
+  const help = useShortcutHelp()
+  const advance = useEnterAdvances()
+  const onCountChange = useCallback((n: number) => setLineCount(n), [])
+
+  /**
+   * A voucher screen is driven from the keyboard, so every action has a key
+   * and the key is printed next to it. Saving is deliberate: Enter walks the
+   * fields, and only this posts the bill.
+   */
+  const actions: VoucherAction[] = [
+    {
+      keys: "mod+s",
+      label: pending ? "Saving…" : "Save bill",
+      hint: "Posts the purchase order. Stock still only moves on receipt.",
+      primary: true,
+      disabled: pending || lineCount === 0,
+      run: () => formRef.current?.requestSubmit(),
+    },
+    {
+      keys: "alt+l",
+      label: "Add a line",
+      hint: "Jumps to the product search",
+      disabled: pending,
+      run: () => searchRef.current?.focus(),
+    },
+    {
+      keys: "alt+s",
+      label: "Supplier",
+      hint: "Jumps back to the supplier field",
+      disabled: pending,
+      run: () => document.getElementById("supplier_id")?.focus(),
+    },
+    {
+      keys: "?",
+      label: "Keys",
+      hint: "This list",
+      run: help.show,
+    },
+    {
+      keys: "escape",
+      label: "Close",
+      hidden: true,
+      run: () => (help.open ? help.hide() : setOpen(false)),
+    },
+  ]
 
   const lines = flattenLines(products)
   const supplierOptions = suppliers
@@ -86,6 +144,8 @@ export function NewPurchaseDialog({
     { value: "", label: "Default location" },
     ...locations.map((l) => ({ value: l.id, label: l.name })),
   ]
+
+  useVoucherKeys(actions, open)
 
   const created = state?.success && state.id && !dismissed ? state : undefined
 
@@ -110,17 +170,27 @@ export function NewPurchaseDialog({
       />
       {/* DialogContent supplies the p-4, so nothing inside adds its own. The
           height cap keeps a long line list inside the viewport. */}
-      <DialogContent className="max-h-[85svh] overflow-y-auto sm:max-w-3xl">
+      <DialogContent className="relative max-h-[85svh] overflow-y-auto sm:max-w-5xl">
+        <ShortcutHelp actions={actions} open={help.open} onClose={help.hide} />
+
         <DialogHeader>
           <DialogTitle>New purchase order</DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="flex flex-wrap items-center gap-x-3 gap-y-1">
             Record what you bought. Stock only moves when you receive it.
+            <ShortcutHint onOpen={help.show} />
           </DialogDescription>
         </DialogHeader>
 
         <CreatedNotice state={created} onDismiss={() => setDismissed(true)} />
 
-        <form key={session} action={action} className="space-y-5">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_11rem]">
+        <form
+          key={session}
+          ref={formRef}
+          action={action}
+          onKeyDown={advance}
+          className="space-y-5"
+        >
           {state?.error ? <FormAlert state={state} /> : null}
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -168,6 +238,8 @@ export function NewPurchaseDialog({
               priceField="unit_price"
               priceLabel="Unit price"
               defaultPriceOf={() => ""}
+              searchRef={searchRef}
+              onCountChange={onCountChange}
             />
           </div>
 
@@ -177,11 +249,23 @@ export function NewPurchaseDialog({
           </div>
 
           <DialogFooter>
-            <Button type="submit" disabled={pending} className="rounded-full">
+            <Button
+              type="submit"
+              disabled={pending || lineCount === 0}
+              className="rounded-full"
+            >
               {pending ? "Saving…" : "Save purchase order"}
             </Button>
           </DialogFooter>
         </form>
+
+        {/* Tally keeps this list down the right of the screen. Borrowed, with
+            the keys spelled out next to real labels. */}
+        <ActionRail
+          actions={actions}
+          className="lg:sticky lg:top-0 lg:h-fit lg:border-l lg:border-border/70 lg:pl-3"
+        />
+        </div>
       </DialogContent>
     </Dialog>
   )

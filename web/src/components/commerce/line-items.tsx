@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { PlusIcon, SearchIcon, XIcon } from "lucide-react"
 
 import type { Line } from "@/components/inventory/quick-stock-sheet"
@@ -53,10 +53,12 @@ function LinePicker({
   lines,
   onPick,
   label,
+  inputRef,
 }: {
   lines: Line[]
   onPick: (line: Line) => void
   label: string
+  inputRef?: React.RefObject<HTMLInputElement | null>
 }) {
   const [query, setQuery] = useState("")
   const needle = query.trim().toLowerCase()
@@ -76,8 +78,18 @@ function LinePicker({
         <div className="relative flex-1">
           <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
+            ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              // The first hit is almost always the one meant, so Enter takes
+              // it instead of moving on.
+              if (e.key === "Enter" && results[0]) {
+                e.preventDefault()
+                e.stopPropagation()
+                pick(results[0])
+              }
+            }}
             placeholder={label}
             className="pl-9"
             aria-label={label}
@@ -141,12 +153,17 @@ export function LineItemsEditor({
   priceLabel,
   currency = "INR",
   defaultPriceOf,
+  searchRef,
+  onCountChange,
 }: {
   lines: Line[]
   priceField: "unit_price" | "rate"
   priceLabel: string
   currency?: string
   defaultPriceOf?: (line: Line) => string
+  /** Lets a key binding put the caret in the product search. */
+  searchRef?: React.RefObject<HTMLInputElement | null>
+  onCountChange?: (count: number) => void
 }) {
   const [rows, setRows] = useState<Row[]>([])
   const [ladder, setLadder] = useState<LadderRow[]>([])
@@ -192,6 +209,10 @@ export function LineItemsEditor({
       ]
     })
 
+  useEffect(() => {
+    onCountChange?.(rows.length)
+  }, [rows.length, onCountChange])
+
   const patch = (key: number, change: Partial<Row>) =>
     setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...change } : r)))
 
@@ -199,7 +220,12 @@ export function LineItemsEditor({
 
   return (
     <div className="space-y-4">
-      <LinePicker lines={lines} onPick={addLine} label="Search products, SKU or barcode" />
+      <LinePicker
+        lines={lines}
+        onPick={addLine}
+        label="Search products, SKU or barcode"
+        inputRef={searchRef}
+      />
 
       {rows.length === 0 ? (
         <p className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
