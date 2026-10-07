@@ -7,6 +7,7 @@ import { ArrowUpRightIcon, TriangleAlertIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { EASE } from "@/components/landing/reveal"
+import { trialCta } from "@/components/landing/trial-cta"
 
 const ROWS = [
   { sku: "LK-4021", name: "Oak shelf bracket, 200 mm", onHand: 148, reorder: 40, status: "ok" },
@@ -104,7 +105,8 @@ function ProductMock() {
   )
 }
 
-export function Hero() {
+export function Hero({ signedIn }: { signedIn: boolean }) {
+  const primary = trialCta(signedIn)
   const reduce = useReducedMotion()
   const fade = (delay: number) => ({
     initial: reduce ? false : { opacity: 0, y: 20 },
@@ -134,9 +136,9 @@ export function Hero() {
             <Button
               size="lg"
               className="group h-12 rounded-full pr-1.5 pl-6 text-base"
-              nativeButton={false} render={<Link href="/signup" />}
+              nativeButton={false} render={<Link href={primary.href} />}
             >
-              Start free trial
+              {primary.label}
               <span className="ml-3 flex size-8 items-center justify-center rounded-full bg-primary-foreground/15 transition-transform duration-500 ease-spring group-hover:translate-x-0.5 group-hover:-translate-y-px">
                 <ArrowUpRightIcon className="size-4" strokeWidth={2} />
               </span>

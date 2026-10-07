@@ -3,9 +3,12 @@ import { ArrowUpRightIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Reveal } from "@/components/landing/reveal"
+import { trialCta } from "@/components/landing/trial-cta"
 
 /** Closing band in the same theme as the page: a tinted tray, one primary CTA. */
-export function Cta() {
+export function Cta({ signedIn }: { signedIn: boolean }) {
+  const primary = trialCta(signedIn)
+
   return (
     <section className="py-24 sm:py-32">
       <div className="container mx-auto max-w-6xl px-4">
@@ -25,9 +28,9 @@ export function Cta() {
                 <Button
                   size="lg"
                   className="group h-12 rounded-full pr-1.5 pl-6 text-base"
-                  nativeButton={false} render={<Link href="/signup" />}
+                  nativeButton={false} render={<Link href={primary.href} />}
                 >
-                  Start free trial
+                  {primary.label}
                   <span className="ml-3 flex size-8 items-center justify-center rounded-full bg-primary-foreground/15 transition-transform duration-500 ease-spring group-hover:translate-x-0.5 group-hover:-translate-y-px">
                     <ArrowUpRightIcon className="size-4" strokeWidth={2} />
                   </span>

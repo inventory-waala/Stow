@@ -7,6 +7,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
 import { cn } from "@/lib/utils"
 import { Logo } from "@/components/brand/logo"
 import { Button } from "@/components/ui/button"
+import { trialCta } from "@/components/landing/trial-cta"
 
 const NAV = [
   { href: "#features", label: "Features" },
@@ -32,22 +33,21 @@ export function Header({ signedIn }: { signedIn: boolean }) {
     }
   }, [open])
 
-  const cta = signedIn ? (
-    <Button size="sm" className="rounded-full px-4" nativeButton={false} render={<Link href="/dashboard" />}>
-      Open dashboard
-    </Button>
-  ) : (
+  const primary = trialCta(signedIn)
+  const cta = (
     <>
-      <Button
-        size="sm"
-        variant="ghost"
-        className="rounded-full px-4"
-        nativeButton={false} render={<Link href="/login" />}
-      >
-        Log in
-      </Button>
-      <Button size="sm" className="rounded-full px-4" nativeButton={false} render={<Link href="/signup" />}>
-        Start free trial
+      {signedIn ? null : (
+        <Button
+          size="sm"
+          variant="ghost"
+          className="rounded-full px-4"
+          nativeButton={false} render={<Link href="/login" />}
+        >
+          Log in
+        </Button>
+      )}
+      <Button size="sm" className="rounded-full px-4" nativeButton={false} render={<Link href={primary.href} />}>
+        {primary.label}
       </Button>
     </>
   )

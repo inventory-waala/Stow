@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Reveal } from "@/components/landing/reveal"
+import { trialCta } from "@/components/landing/trial-cta"
 
 type Cycle = "monthly" | "yearly"
 
@@ -65,9 +66,12 @@ const PLANS: Plan[] = [
   },
 ]
 
-export function Pricing() {
+export function Pricing({ signedIn }: { signedIn: boolean }) {
   const [yearly, setYearly] = useState(false)
   const cycle: Cycle = yearly ? "yearly" : "monthly"
+  // Only the sign-up plans change; Enterprise still points at sales.
+  const resolveCta = (cta: Plan["cta"]) =>
+    cta.href === "/signup" ? trialCta(signedIn) : cta
 
   return (
     <section id="pricing" className="scroll-mt-24 border-t border-border/60 py-24 sm:py-32">
@@ -137,9 +141,10 @@ export function Pricing() {
                 <Button
                   variant={plan.recommended ? "default" : "outline"}
                   className="w-full rounded-full"
-                  nativeButton={false} render={<Link href={plan.cta.href} />}
+                  nativeButton={false}
+                  render={<Link href={resolveCta(plan.cta).href} />}
                 >
-                  {plan.cta.label}
+                  {resolveCta(plan.cta).label}
                 </Button>
               </div>
             </div>

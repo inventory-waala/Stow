@@ -11,19 +11,20 @@ import { TrustStrip } from "@/components/landing/trust-strip"
 
 export default async function Home() {
   const session = await getSession()
+  const signedIn = session !== null
 
   return (
     <>
       <div className="grain" aria-hidden="true" />
-      <Header signedIn={session !== null} />
+      <Header signedIn={signedIn} />
       <main id="main" className="overflow-x-clip">
-        <Hero />
+        <Hero signedIn={signedIn} />
         <TrustStrip />
         <Features />
         <HowItWorks />
-        <Pricing />
+        <Pricing signedIn={signedIn} />
         <Testimonials />
-        <Cta />
+        <Cta signedIn={signedIn} />
       </main>
       <Footer />
     </>
