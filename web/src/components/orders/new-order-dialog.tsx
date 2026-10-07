@@ -11,14 +11,14 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet"
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { FormAlert } from "@/components/inventory/primitives"
 import { SelectField } from "@/components/inventory/select-field"
@@ -57,7 +57,7 @@ function CreatedNotice({ state, onDismiss }: { state: ActionState; onDismiss: ()
  * it and fulfilling ships it, both from the detail page. A line left without a
  * rate takes the catalog sell price at the moment the order is written.
  */
-export function NewOrderSheet({
+export function NewOrderDialog({
   customers,
   products,
   locations,
@@ -83,7 +83,7 @@ export function NewOrderSheet({
   const created = state?.success && state.id && !dismissed ? state : undefined
 
   return (
-    <Sheet
+    <Dialog
       open={open}
       onOpenChange={(o) => {
         if (o) {
@@ -93,7 +93,7 @@ export function NewOrderSheet({
         setOpen(o)
       }}
     >
-      <SheetTrigger
+      <DialogTrigger
         render={
           <Button className="rounded-full px-4" disabled={!customerOptions.length}>
             <PlusIcon className="size-4" />
@@ -101,19 +101,17 @@ export function NewOrderSheet({
           </Button>
         }
       />
-      <SheetContent className="w-full overflow-y-auto sm:max-w-[max(32rem,40vw)]!">
-        <SheetHeader>
-          <SheetTitle>New order</SheetTitle>
-          <SheetDescription>
+      <DialogContent className="max-h-[85svh] overflow-y-auto sm:max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>New order</DialogTitle>
+          <DialogDescription>
             Build the invoice. Stock is only held when you confirm it.
-          </SheetDescription>
-        </SheetHeader>
+          </DialogDescription>
+        </DialogHeader>
 
-        <div className="space-y-4 px-4">
-          <CreatedNotice state={created} onDismiss={() => setDismissed(true)} />
-        </div>
+        <CreatedNotice state={created} onDismiss={() => setDismissed(true)} />
 
-        <form key={session} action={action} className="space-y-5 px-4 pb-4">
+        <form key={session} action={action} className="space-y-5">
           {state?.error ? <FormAlert state={state} /> : null}
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -168,13 +166,13 @@ export function NewOrderSheet({
             <Textarea id="notes" name="notes" rows={2} />
           </div>
 
-          <SheetFooter className="px-0">
+          <DialogFooter>
             <Button type="submit" disabled={pending} className="rounded-full">
               {pending ? "Saving…" : "Save order"}
             </Button>
-          </SheetFooter>
+          </DialogFooter>
         </form>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   )
 }

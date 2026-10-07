@@ -5,7 +5,7 @@ import { getLocations, getProducts } from "@/lib/inventory/data"
 import type { OrderStatus } from "@/lib/orders/types"
 import { PageHeader } from "@/components/layout/page-header"
 import { Panel, ServiceNotice } from "@/components/inventory/primitives"
-import { NewOrderSheet } from "@/components/orders/new-order-sheet"
+import { NewOrderDialog } from "@/components/orders/new-order-dialog"
 import { OrderFilters, OrdersTable } from "@/components/orders/orders-table"
 import { SummaryStrip } from "@/components/commerce/summary-strip"
 
@@ -37,7 +37,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/orders">)
         title="Orders"
         description="Customer invoices, and the stock they take out."
         action={
-          <NewOrderSheet
+          <NewOrderDialog
             customers={customers.ok ? customers.data.items : []}
             products={products.ok ? products.data.items : []}
             locations={locations.ok ? locations.data : []}

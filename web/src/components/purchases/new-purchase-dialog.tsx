@@ -11,14 +11,14 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet"
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { FormAlert } from "@/components/inventory/primitives"
 import { SelectField } from "@/components/inventory/select-field"
@@ -60,10 +60,11 @@ function CreatedNotice({ state, onDismiss }: { state: ActionState; onDismiss: ()
  * detail page when the goods actually arrive — so this form is safe to submit
  * as soon as the supplier invoice is in hand.
  *
- * Like the new-product sheet, it stays open after a successful save so several
- * invoices can be entered in a row.
+ * Stays open after a successful save so several invoices can be entered in a
+ * row. A centred dialog rather than a side sheet: the line editor needs the
+ * horizontal room more than the page behind it needs to stay visible.
  */
-export function NewPurchaseSheet({
+export function NewPurchaseDialog({
   suppliers,
   products,
   locations,
@@ -89,7 +90,7 @@ export function NewPurchaseSheet({
   const created = state?.success && state.id && !dismissed ? state : undefined
 
   return (
-    <Sheet
+    <Dialog
       open={open}
       onOpenChange={(o) => {
         if (o) {
@@ -99,7 +100,7 @@ export function NewPurchaseSheet({
         setOpen(o)
       }}
     >
-      <SheetTrigger
+      <DialogTrigger
         render={
           <Button className="rounded-full px-4" disabled={!supplierOptions.length}>
             <PlusIcon className="size-4" />
@@ -107,22 +108,19 @@ export function NewPurchaseSheet({
           </Button>
         }
       />
-      {/* The primitive's data-[side=right]:sm:max-w-sm outranks a plain
-          max-w utility, hence the `!`. Line items need the room, so this
-          takes 40% of a wide screen and never drops below 32rem. */}
-      <SheetContent className="w-full overflow-y-auto sm:max-w-[max(32rem,40vw)]!">
-        <SheetHeader>
-          <SheetTitle>New purchase order</SheetTitle>
-          <SheetDescription>
+      {/* DialogContent supplies the p-4, so nothing inside adds its own. The
+          height cap keeps a long line list inside the viewport. */}
+      <DialogContent className="max-h-[85svh] overflow-y-auto sm:max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>New purchase order</DialogTitle>
+          <DialogDescription>
             Record what you bought. Stock only moves when you receive it.
-          </SheetDescription>
-        </SheetHeader>
+          </DialogDescription>
+        </DialogHeader>
 
-        <div className="space-y-4 px-4">
-          <CreatedNotice state={created} onDismiss={() => setDismissed(true)} />
-        </div>
+        <CreatedNotice state={created} onDismiss={() => setDismissed(true)} />
 
-        <form key={session} action={action} className="space-y-5 px-4 pb-4">
+        <form key={session} action={action} className="space-y-5">
           {state?.error ? <FormAlert state={state} /> : null}
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -178,13 +176,13 @@ export function NewPurchaseSheet({
             <Textarea id="notes" name="notes" rows={2} />
           </div>
 
-          <SheetFooter className="px-0">
+          <DialogFooter>
             <Button type="submit" disabled={pending} className="rounded-full">
               {pending ? "Saving…" : "Save purchase order"}
             </Button>
-          </SheetFooter>
+          </DialogFooter>
         </form>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   )
 }

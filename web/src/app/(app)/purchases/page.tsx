@@ -5,7 +5,7 @@ import { getLocations, getProducts } from "@/lib/inventory/data"
 import type { PurchaseStatus } from "@/lib/purchases/types"
 import { PageHeader } from "@/components/layout/page-header"
 import { Panel, ServiceNotice } from "@/components/inventory/primitives"
-import { NewPurchaseSheet } from "@/components/purchases/new-purchase-sheet"
+import { NewPurchaseDialog } from "@/components/purchases/new-purchase-dialog"
 import { PurchaseFilters, PurchasesTable } from "@/components/purchases/purchases-table"
 import { SummaryStrip } from "@/components/commerce/summary-strip"
 
@@ -37,7 +37,7 @@ export default async function PurchasesPage({ searchParams }: PageProps<"/purcha
         title="Purchases"
         description="Supplier invoices, and the stock they bring in."
         action={
-          <NewPurchaseSheet
+          <NewPurchaseDialog
             suppliers={suppliers.ok ? suppliers.data.items : []}
             products={products.ok ? products.data.items : []}
             locations={locations.ok ? locations.data : []}
