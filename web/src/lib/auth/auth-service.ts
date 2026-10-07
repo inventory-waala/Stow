@@ -117,6 +117,17 @@ export const authApi = {
       accessToken,
     }),
 
+  /** Edits the workspace on the token; the server ignores any other id. */
+  updateTenant: (
+    accessToken: string,
+    body: { name?: string; description?: string }
+  ) =>
+    authRequest<Tenant>("/tenants/me", {
+      method: "PATCH",
+      body: JSON.stringify(body),
+      accessToken,
+    }),
+
   switchTenant: (accessToken: string, tenant_id: string) =>
     authRequest<{ accessToken: string }>("/auth/switch-tenant", {
       method: "POST",

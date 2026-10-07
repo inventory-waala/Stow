@@ -1,5 +1,6 @@
 "use server"
 
+import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { z } from "zod"
 
@@ -149,6 +150,33 @@ export async function switchTenantAction(tenantId: string): Promise<FormState> {
     return { error: toMessage(err, "Could not switch workspace") }
   }
   redirect("/dashboard")
+}
+
+export async function updateTenantAction(
+  _prev: FormState,
+  formData: FormData
+): Promise<FormState> {
+  const session = await getSession()
+  if (!session) redirect("/login")
+  const name = String(formData.get("name") ?? "").trim()
+  const description = String(formData.get("description") ?? "").trim()
+  if (!name) return { error: "Workspace name is required", field: "name" }
+  if (name.length > 100) {
+    return { error: "Workspace name is too long", field: "name" }
+  }
+  if (description.length > 500) {
+    return { error: "Description is too long", field: "description" }
+  }
+  try {
+    await authApi.updateTenant(session.accessToken, { name, description })
+  } catch (err) {
+    return { error: toMessage(err, "Could not save the workspace") }
+  }
+  // The name shows in the sidebar's workspace switcher, which the (app)
+  // layout renders, so the whole layout has to be revalidated — not just
+  // this page.
+  revalidatePath("/", "layout")
+  return { success: "Workspace saved" }
 }
 
 export async function createTenantAction(
