@@ -3,7 +3,7 @@ import { redirect } from "next/navigation"
 
 import { getCurrentUser, getMyTenants } from "@/lib/auth/session"
 import { SettingsSection } from "@/components/settings/section"
-import { WorkspaceDetailsForm } from "@/components/settings/workspace-details-form"
+import { EditWorkspaceDialog } from "@/components/settings/edit-workspace-dialog"
 import { WorkspaceProfile } from "@/components/settings/workspace-profile"
 import { Button } from "@/components/ui/button"
 
@@ -22,22 +22,14 @@ export default async function WorkspacePage() {
       description="The company workspace you are currently working in."
     >
       {tenant ? (
-        <>
-          <WorkspaceProfile tenant={tenant} user={user} tenantCount={tenants.length} />
-          {/* The server enforces this too; hiding the form from everyone else
-              just avoids offering an action that would come back 403. */}
-          {canEdit ? (
-            <div className="rounded-2xl border border-border/70 bg-card p-5 shadow-ambient sm:p-6">
-              <div className="mb-5">
-                <h4 className="text-sm font-medium">Edit details</h4>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  Only owners and admins can change these.
-                </p>
-              </div>
-              <WorkspaceDetailsForm tenant={tenant} />
-            </div>
-          ) : null}
-        </>
+        <WorkspaceProfile
+          tenant={tenant}
+          user={user}
+          tenantCount={tenants.length}
+          // The server enforces this too; withholding the button just avoids
+          // offering an action that would come back 403.
+          editAction={canEdit ? <EditWorkspaceDialog tenant={tenant} /> : null}
+        />
       ) : (
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">

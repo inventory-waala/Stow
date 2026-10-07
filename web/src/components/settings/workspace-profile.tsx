@@ -47,10 +47,13 @@ export function WorkspaceProfile({
   tenant,
   user,
   tenantCount,
+  editAction,
 }: {
   tenant: Tenant
   user: Profile
   tenantCount: number
+  /** Rendered beside "New workspace"; omitted when the caller may not edit. */
+  editAction?: React.ReactNode
 }) {
   return (
     <div className="rounded-[1.5rem] border border-border/70 bg-secondary/50 p-1.5">
@@ -121,7 +124,8 @@ export function WorkspaceProfile({
         </Detail>
       </div>
 
-      <div className="flex justify-end p-3 pt-1.5">
+      <div className="flex flex-wrap items-center justify-end gap-2 p-3 pt-1.5">
+        {editAction}
         <Button
           variant="outline"
           className="group rounded-full pr-1.5"
