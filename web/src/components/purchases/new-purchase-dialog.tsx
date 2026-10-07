@@ -170,7 +170,7 @@ export function NewPurchaseDialog({
       />
       {/* DialogContent supplies the p-4, so nothing inside adds its own. The
           height cap keeps a long line list inside the viewport. */}
-      <DialogContent className="relative max-h-[85svh] overflow-y-auto sm:max-w-5xl">
+      <DialogContent className="max-h-[85svh] overflow-y-auto sm:max-w-5xl">
         <ShortcutHelp actions={actions} open={help.open} onClose={help.hide} />
 
         <DialogHeader>

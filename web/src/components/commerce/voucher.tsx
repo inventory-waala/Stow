@@ -187,11 +187,14 @@ export function ShortcutHelp({
   onClose: () => void
 }) {
   if (!open) return null
+  // Fixed rather than anchored to the dialog: anchoring would mean giving
+  // DialogContent `relative`, which overrides its own `fixed` and drops the
+  // whole dialog out of the centre of the screen.
   return (
     <div
       role="dialog"
       aria-label="Keyboard shortcuts"
-      className="absolute inset-0 z-10 flex items-end justify-center bg-background/80 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-60 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
