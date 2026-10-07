@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useId, useRef, useState } from "react"
 import { PlusIcon, Trash2Icon } from "lucide-react"
 
 import type {
@@ -31,10 +31,14 @@ export function codeFor(label: string): string {
   )
 }
 
-let seq = 0
-export function newRow(label = ""): LadderRow {
+/**
+ * `key` is supplied by the caller rather than a module counter: a counter
+ * resets on a Fast Refresh while the rows on screen keep the old numbers, and
+ * the next add then hands out a duplicate React key.
+ */
+export function newRow(key: string, label = ""): LadderRow {
   return {
-    key: `rung-${++seq}`,
+    key,
     code: "",
     label,
     basis: "PERCENT",
@@ -71,12 +75,14 @@ export function DeductionLadder({
   disabled?: boolean
 }) {
   const [adding, setAdding] = useState("")
+  const keySeq = useRef(0)
+  const instance = useId()
 
   const update = (key: string, patch: Partial<LadderRow>) =>
     onChange(rows.map((r) => (r.key === key ? { ...r, ...patch } : r)))
 
   const add = (label: string) => {
-    onChange([...rows, newRow(label)])
+    onChange([...rows, newRow(`${instance}-${(keySeq.current += 1)}`, label)])
     setAdding("")
   }
 

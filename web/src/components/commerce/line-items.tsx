@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useId, useMemo, useState } from "react"
+import { useEffect, useId, useMemo, useRef, useState } from "react"
 import { PlusIcon, SearchIcon, XIcon } from "lucide-react"
 
 import type { Line } from "@/components/inventory/quick-stock-sheet"
@@ -24,7 +24,7 @@ import {
 import { fmtQty } from "@/components/inventory/primitives"
 
 export interface Row {
-  key: number
+  key: string
   line: Line | null
   quantity: string
   price: string
@@ -37,16 +37,6 @@ const DISCOUNT_OPTIONS = [
   { value: "PERCENT", label: "%" },
   { value: "AMOUNT", label: "Amount" },
 ]
-
-let nextKey = 1
-const blankRow = (): Row => ({
-  key: nextKey++,
-  line: null,
-  quantity: "1",
-  price: "",
-  discountType: "NONE",
-  discount: "",
-})
 
 /** Search-and-pick over every stock unit in the catalog, including by barcode. */
 function LinePicker({
@@ -207,6 +197,8 @@ export function LineItemsEditor({
   onCountChange?: (count: number) => void
 }) {
   const [rows, setRows] = useState<Row[]>([])
+  const keySeq = useRef(0)
+  const instance = useId()
   const [ladder, setLadder] = useState<LadderRow[]>([])
   const [rounding, setRounding] = useState<Rounding>("NONE")
   const [cgstRate, setCgstRate] = useState("")
@@ -227,7 +219,24 @@ export function LineItemsEditor({
     rounding,
   })
 
-  const addLine = (line: Line) =>
+  /**
+   * Keys are minted here rather than inside the updater below. A `setState`
+   * updater has to be pure — React may run it more than once — and a
+   * module-level counter would also reset on a Fast Refresh while the rows on
+   * screen still held the old numbers, handing out a duplicate. The `useId`
+   * prefix keeps two editors on one page from colliding.
+   */
+  const nextKey = () => `${instance}-${(keySeq.current += 1)}`
+
+  const addLine = (line: Line) => {
+    const fresh: Row = {
+      key: nextKey(),
+      line,
+      quantity: "1",
+      price: defaultPriceOf?.(line) ?? line.sellPrice ?? "",
+      discountType: "NONE",
+      discount: "",
+    }
     setRows((prev) => {
       // Adding the same unit twice bumps the quantity instead of making a
       // second row the server would treat as a separate line.
@@ -240,24 +249,18 @@ export function LineItemsEditor({
         }
         return next
       }
-      return [
-        ...prev,
-        {
-          ...blankRow(),
-          line,
-          price: defaultPriceOf?.(line) ?? line.sellPrice ?? "",
-        },
-      ]
+      return [...prev, fresh]
     })
+  }
 
   useEffect(() => {
     onCountChange?.(rows.length)
   }, [rows.length, onCountChange])
 
-  const patch = (key: number, change: Partial<Row>) =>
+  const patch = (key: string, change: Partial<Row>) =>
     setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...change } : r)))
 
-  const drop = (key: number) => setRows((prev) => prev.filter((r) => r.key !== key))
+  const drop = (key: string) => setRows((prev) => prev.filter((r) => r.key !== key))
 
   return (
     <div className="space-y-4">
