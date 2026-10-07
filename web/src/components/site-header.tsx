@@ -12,6 +12,7 @@ const TITLES: Record<string, string> = {
   dashboard: "Dashboard",
   inventory: "Inventory",
   purchases: "Purchases",
+  suppliers: "Suppliers",
   orders: "Orders",
   customers: "Customers",
   team: "Team",
