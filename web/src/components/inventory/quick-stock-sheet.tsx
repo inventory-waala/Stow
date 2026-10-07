@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useId, useMemo, useState } from "react"
 import { ArrowLeftRightIcon, ChevronRightIcon, ScanBarcodeIcon, SearchIcon } from "lucide-react"
 
 import type { Location, ProductListItem, StockTotals } from "@/lib/inventory/types"
@@ -243,11 +243,47 @@ export function LinePicker({
   autoFocus?: boolean
   className?: string
 }) {
+  const [active, setActive] = useState(0)
+  const listId = useId()
   const q = query.trim().toLowerCase()
   // A scanned barcode matches exactly and jumps straight to the line.
   const exact = exactMatch(lines, q)
   const matches = q ? lines.filter((l) => q.split(/\s+/).every((w) => l.text.includes(w))) : lines
   const shown = (exact ? [exact, ...matches.filter((m) => m !== exact)] : matches).slice(0, 40)
+
+  // A new query means the old highlight is meaningless; clamping also stops it
+  // pointing past the end when one more letter shortens the list.
+  const at = Math.min(active, Math.max(shown.length - 1, 0))
+
+  useEffect(() => {
+    setActive(0)
+  }, [query])
+
+  // Forty rows scroll, so the highlight has to bring itself into view.
+  useEffect(() => {
+    document
+      .getElementById(`${listId}-${at}`)
+      ?.scrollIntoView({ block: "nearest" })
+  }, [listId, at])
+
+  const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!shown.length) return
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault()
+      event.stopPropagation()
+      const by = event.key === "ArrowDown" ? 1 : -1
+      setActive((prev) => {
+        const from = Math.min(prev, shown.length - 1)
+        return (from + by + shown.length) % shown.length
+      })
+      return
+    }
+    if (event.key === "Enter") {
+      event.preventDefault()
+      event.stopPropagation()
+      onPick(shown[at])
+    }
+  }
 
   return (
     <div className={cn("grid gap-3", className)}>
@@ -257,16 +293,16 @@ export function LinePicker({
           <Input
             value={query}
             onChange={(e) => onQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && shown.length) {
-                e.preventDefault()
-                onPick(exact ?? shown[0])
-              }
-            }}
+            onKeyDown={onKeyDown}
             placeholder="Product, variant, SKU or barcode…"
             autoFocus={autoFocus}
             aria-label="Find a stock line"
             className="pl-8"
+            role="combobox"
+            aria-expanded={shown.length > 0}
+            aria-controls={listId}
+            aria-activedescendant={shown.length ? `${listId}-${at}` : undefined}
+            autoComplete="off"
           />
         </div>
         <ScanButton
@@ -281,13 +317,23 @@ export function LinePicker({
       </div>
       {shown.length ? (
         <div className="overflow-hidden rounded-xl border border-border/70">
-          <div className="divide-y divide-border/70">
-            {shown.map((l) => (
+          <div id={listId} role="listbox" aria-label="Stock lines" className="divide-y divide-border/70">
+            {shown.map((l, i) => (
               <button
                 key={l.sizeId}
+                id={`${listId}-${i}`}
+                role="option"
+                aria-selected={i === at}
                 type="button"
+                tabIndex={-1}
                 onClick={() => onPick(l)}
-                className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 px-3 py-2 text-left text-sm transition-colors hover:bg-secondary/60"
+                // Hovering moves the highlight, so mouse and keyboard never
+                // disagree about which row Enter would take.
+                onMouseEnter={() => setActive(i)}
+                className={cn(
+                  "grid w-full grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 px-3 py-2 text-left text-sm transition-colors",
+                  i === at ? "bg-secondary" : "hover:bg-secondary/60"
+                )}
               >
                 <span className="min-w-0">
                   <span className="block truncate font-medium">

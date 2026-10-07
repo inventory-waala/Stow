@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useId, useMemo, useState } from "react"
 import { PlusIcon, SearchIcon, XIcon } from "lucide-react"
 
 import type { Line } from "@/components/inventory/quick-stock-sheet"
@@ -61,15 +61,44 @@ function LinePicker({
   inputRef?: React.RefObject<HTMLInputElement | null>
 }) {
   const [query, setQuery] = useState("")
+  const [active, setActive] = useState(0)
+  const listId = useId()
   const needle = query.trim().toLowerCase()
   const results = useMemo(
     () => (needle ? lines.filter((l) => l.text.includes(needle)).slice(0, 8) : []),
     [lines, needle]
   )
 
+  // A fresh set of hits means the old highlight is meaningless, and typing one
+  // more letter must not leave the selection pointing past the end.
+  const at = Math.min(active, Math.max(results.length - 1, 0))
+
   const pick = (line: Line) => {
     onPick(line)
     setQuery("")
+    setActive(0)
+  }
+
+  const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!results.length) return
+    // The list is the thing being driven here, so these keys never reach the
+    // form's Enter-advances handler or the voucher's own bindings.
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault()
+      event.stopPropagation()
+      const by = event.key === "ArrowDown" ? 1 : -1
+      // Wraps, so holding one arrow cycles instead of dead-ending.
+      setActive((prev) => {
+        const from = Math.min(prev, results.length - 1)
+        return (from + by + results.length) % results.length
+      })
+      return
+    }
+    if (event.key === "Enter") {
+      event.preventDefault()
+      event.stopPropagation()
+      pick(results[at])
+    }
   }
 
   return (
@@ -80,19 +109,19 @@ function LinePicker({
           <Input
             ref={inputRef}
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => {
-              // The first hit is almost always the one meant, so Enter takes
-              // it instead of moving on.
-              if (e.key === "Enter" && results[0]) {
-                e.preventDefault()
-                e.stopPropagation()
-                pick(results[0])
-              }
+            onChange={(e) => {
+              setQuery(e.target.value)
+              setActive(0)
             }}
+            onKeyDown={onKeyDown}
             placeholder={label}
             className="pl-9"
             aria-label={label}
+            role="combobox"
+            aria-expanded={results.length > 0}
+            aria-controls={listId}
+            aria-activedescendant={results.length ? `${listId}-${at}` : undefined}
+            autoComplete="off"
           />
         </div>
         <ScanButton
@@ -111,13 +140,25 @@ function LinePicker({
       ) : null}
 
       {results.length ? (
-        <ul className="divide-y divide-border/60 overflow-hidden rounded-lg border border-border/70">
-          {results.map((line) => (
-            <li key={line.sizeId}>
+        <ul
+          id={listId}
+          role="listbox"
+          aria-label={label}
+          className="divide-y divide-border/60 overflow-hidden rounded-lg border border-border/70"
+        >
+          {results.map((line, i) => (
+            <li key={line.sizeId} id={`${listId}-${i}`} role="option" aria-selected={i === at}>
               <button
                 type="button"
+                tabIndex={-1}
                 onClick={() => pick(line)}
-                className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-secondary/60"
+                // Hovering moves the highlight, so mouse and keyboard never
+                // disagree about which row Enter would take.
+                onMouseEnter={() => setActive(i)}
+                className={cn(
+                  "flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm",
+                  i === at ? "bg-secondary" : "hover:bg-secondary/60"
+                )}
               >
                 <span className="min-w-0">
                   <span className="block truncate font-medium">{line.product}</span>
