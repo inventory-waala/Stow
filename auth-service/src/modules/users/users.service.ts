@@ -15,7 +15,6 @@ import {
   ITokenService,
   TOKEN_SERVICE,
 } from '../tokens/interface/token.service.interface';
-import { TenantsService } from '../tenants/tenants.service';
 import { MailService } from '../mail/mail.service';
 
 @Injectable()
@@ -27,7 +26,6 @@ export class UsersService implements IUsersService {
     private readonly usersRepository: IUsersRepository,
     @Inject(TOKEN_SERVICE)
     private readonly tokenService: ITokenService,
-    private readonly tenantsService: TenantsService,
     private readonly mailService: MailService,
   ) {}
 
@@ -48,19 +46,18 @@ export class UsersService implements IUsersService {
       name: user.name,
     });
 
-    // Auto-provision a tenant + owner role for this user.
-    // The user row is already committed, so if provisioning fails we must undo
-    // it -- otherwise the account exists with no tenant and the email is burned:
-    // the caller can never retry, because registration would then report
-    // "Email is already in use".
-    let tenantId: string;
+    // No workspace is created here. Registration says who you are; choosing
+    // or naming the company you work in is a separate, deliberate step, so a
+    // fresh account lands with no tenant and the client sends it through the
+    // create-workspace flow. A tenant named after someone's display name was
+    // never what they wanted, and it could not be renamed.
+    //
+    // The user row is already committed, so if the verification token fails we
+    // must undo it -- otherwise the account exists unverifiable and the email
+    // is burned: the caller can never retry, because registration would then
+    // report "Email is already in use".
     let verificationToken: string;
     try {
-      tenantId = await this.tenantsService.createWithOwnerRole(
-        newUser.id,
-        user.name || user.email.split('@')[0],
-      );
-
       verificationToken =
         await this.tokenService.generateEmailVerificationToken(newUser.id);
     } catch (error) {
@@ -77,7 +74,6 @@ export class UsersService implements IUsersService {
     const { password: _password, ...safeUser } = newUser;
     return {
       ...safeUser,
-      tenantId,
       // The raw token is only exposed outside production so local flows can
       // be completed without a mailbox; in production it travels by email only.
       ...(process.env.NODE_ENV !== 'production' ? { verificationToken } : {}),
