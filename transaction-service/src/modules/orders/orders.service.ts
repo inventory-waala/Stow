@@ -37,7 +37,7 @@ const TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   FULFILLED: ['RETURNED'],
   CANCELLED: [],
   RETURNED: [],
-}
+};
 
 /**
  * Stock may be reserved from any stage before it has shipped. Reserving locks
@@ -45,7 +45,7 @@ const TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
  * order in REVIEW that has reserved stock cannot have its discount changed
  * until the reservation is released.
  */
-const CONFIRMABLE: OrderStatus[] = ['DRAFT', 'PENDING', 'REVIEW', 'APPROVED']
+const CONFIRMABLE: OrderStatus[] = ['DRAFT', 'PENDING', 'REVIEW', 'APPROVED'];
 
 /** An approved order may ship directly without a separate reservation step. */
 const FULFILLABLE: OrderStatus[] = ['CONFIRMED', 'APPROVED', 'PENDING'];
@@ -62,7 +62,7 @@ export class OrdersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly inventory: InventoryClient,
-  ) {}
+  ) { }
 
   async list(tenantId: string, query: ListOrdersDto) {
     const where: Prisma.OrderWhereInput = {
@@ -72,27 +72,29 @@ export class OrdersService {
       ...(query.customer ? { customer_id: query.customer } : {}),
       ...(query.min_amount || query.max_amount
         ? {
-            total_amount: {
-              ...(query.min_amount ? { gte: query.min_amount } : {}),
-              ...(query.max_amount ? { lte: query.max_amount } : {}),
-            },
-          }
+          total_amount: {
+            ...(query.min_amount ? { gte: query.min_amount } : {}),
+            ...(query.max_amount ? { lte: query.max_amount } : {}),
+          },
+        }
         : {}),
       ...(query.from || query.to
         ? {
-            order_date: {
-              ...(query.from ? { gte: new Date(query.from) } : {}),
-              ...(query.to ? { lte: new Date(query.to) } : {}),
-            },
-          }
+          order_date: {
+            ...(query.from ? { gte: new Date(query.from) } : {}),
+            ...(query.to ? { lte: new Date(query.to) } : {}),
+          },
+        }
         : {}),
       ...(query.q
         ? {
-            OR: [
-              { invoice_no: { contains: query.q, mode: 'insensitive' } },
-              { customer: { name: { contains: query.q, mode: 'insensitive' } } },
-            ],
-          }
+          OR: [
+            { invoice_no: { contains: query.q, mode: 'insensitive' } },
+            {
+              customer: { name: { contains: query.q, mode: 'insensitive' } },
+            },
+          ],
+        }
         : {}),
     };
 
@@ -205,12 +207,14 @@ export class OrdersService {
       );
     }
     if (existing.status === 'CANCELLED' || existing.status === 'RETURNED') {
-      throw new ConflictException(`A ${existing.status} order cannot be edited`);
+      throw new ConflictException(
+        `A ${existing.status} order cannot be edited`,
+      );
     }
     if (existing.reserved_at) {
       throw new ConflictException(
         'This order holds reserved stock. Cancel it to release the reservation ' +
-          'before editing the lines.',
+        'before editing the lines.',
       );
     }
 
@@ -240,9 +244,12 @@ export class OrdersService {
         dto.special_discount_type ?? existing.special_discount_type,
       special_discount:
         dto.special_discount ?? existing.special_discount.toString(),
-      cgst_rate: dto.cgst_rate ?? rateOf(existing.cgst, existing.taxable_amount),
-      sgst_rate: dto.sgst_rate ?? rateOf(existing.sgst, existing.taxable_amount),
-      igst_rate: dto.igst_rate ?? rateOf(existing.igst, existing.taxable_amount),
+      cgst_rate:
+        dto.cgst_rate ?? rateOf(existing.cgst, existing.taxable_amount),
+      sgst_rate:
+        dto.sgst_rate ?? rateOf(existing.sgst, existing.taxable_amount),
+      igst_rate:
+        dto.igst_rate ?? rateOf(existing.igst, existing.taxable_amount),
     });
 
     try {
@@ -538,7 +545,7 @@ export class OrdersService {
       if (rate === null) {
         throw new BadRequestException(
           `No rate given for ${size.product?.name ?? item.size_id} and the ` +
-            `catalog has no sell price for it`,
+          `catalog has no sell price for it`,
         );
       }
       return {
