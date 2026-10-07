@@ -59,7 +59,7 @@ export function NewCustomerSheet() {
           </Button>
         }
       />
-      <SheetContent className="w-full overflow-y-auto sm:max-w-lg">
+      <SheetContent className="w-full overflow-y-auto sm:max-w-lg!">
         <SheetHeader>
           <SheetTitle>New customer</SheetTitle>
           <SheetDescription>

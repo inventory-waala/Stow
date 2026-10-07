@@ -61,7 +61,7 @@ export function NewSupplierSheet() {
           </Button>
         }
       />
-      <SheetContent className="w-full overflow-y-auto sm:max-w-lg">
+      <SheetContent className="w-full overflow-y-auto sm:max-w-lg!">
         <SheetHeader>
           <SheetTitle>New supplier</SheetTitle>
           <SheetDescription>

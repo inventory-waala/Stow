@@ -107,7 +107,10 @@ export function NewPurchaseSheet({
           </Button>
         }
       />
-      <SheetContent className="w-full overflow-y-auto sm:max-w-2xl">
+      {/* The primitive's data-[side=right]:sm:max-w-sm outranks a plain
+          max-w utility, hence the `!`. A quarter of the viewport, but never
+          narrower than the 24rem it used to get on a small laptop. */}
+      <SheetContent className="w-full overflow-y-auto sm:max-w-[max(24rem,25vw)]!">
         <SheetHeader>
           <SheetTitle>New purchase order</SheetTitle>
           <SheetDescription>
