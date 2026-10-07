@@ -70,19 +70,6 @@ export function SelectField({
     [options]
   )
 
-  /**
-   * Put the caret back on the trigger after a choice.
-   *
-   * The popup is portalled outside whatever dialog the field sits in, so when
-   * it unmounts focus lands on document.body for an instant — long enough for
-   * the dialog's focus trap to decide focus has escaped and recover it to the
-   * first tabbable thing in the dialog. Which is somewhere near the title, not
-   * the field you were filling in. Re-asserting on the next frame runs after
-   * the trap and lands where a select is expected to leave you.
-   */
-  const keepFocus = () =>
-    requestAnimationFrame(() => triggerRef.current?.focus({ preventScroll: true }))
-
   return (
     <>
       {name ? <input type="hidden" name={name} value={hasOption ? current : ""} /> : null}
@@ -93,7 +80,6 @@ export function SelectField({
           const next = fromInner(v)
           if (!controlled) setInner(next)
           onValueChange?.(next)
-          keepFocus()
         }}
         disabled={disabled}
       >
@@ -107,7 +93,21 @@ export function SelectField({
         </SelectTrigger>
         {/* Drop below the trigger like a conventional select instead of
             overlaying it; the group adds the inner padding around items. */}
-        <SelectContent alignItemWithTrigger={false} align="start" sideOffset={4}>
+        {/*
+          finalFocus is where the caret lands when the popup closes. Base UI
+          passes it to the floating focus manager as `returnFocus`, resolved
+          after the exit transition; left unset it restores a remembered
+          element, which goes stale if the trigger re-rendered in between —
+          focus then falls to the body and the surrounding dialog's focus trap
+          recovers it to the first tabbable thing near the title. A live ref
+          cannot go stale.
+        */}
+        <SelectContent
+          finalFocus={triggerRef}
+          alignItemWithTrigger={false}
+          align="start"
+          sideOffset={4}
+        >
           <SelectGroup>
             {items.map((o) => (
               <SelectItem key={o.value} value={o.value} className="py-1.5">

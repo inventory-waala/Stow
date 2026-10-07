@@ -170,7 +170,13 @@ export function NewPurchaseDialog({
       />
       {/* DialogContent supplies the p-4, so nothing inside adds its own. The
           height cap keeps a long line list inside the viewport. */}
-      <DialogContent className="max-h-[85svh] overflow-y-auto sm:max-w-5xl">
+      {/* Without this the dialog focuses its first tabbable element, which is
+          the keyboard hint beside the title. A voucher should open on its
+          first field, and it also stops focus recovery landing up there. */}
+      <DialogContent
+        initialFocus={() => document.getElementById("supplier_id")}
+        className="max-h-[85svh] overflow-y-auto sm:max-w-5xl"
+      >
         <ShortcutHelp actions={actions} open={help.open} onClose={help.hide} />
 
         <DialogHeader>
