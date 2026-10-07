@@ -22,6 +22,8 @@ import { ScanButton } from "./scanner/scan-button"
 export interface Line {
   sizeId: string
   productId: string
+  /** Groups the sizes of one style/colour together in the voucher picker. */
+  variantId: string
   product: string
   code: string | null
   variant: string
@@ -46,6 +48,7 @@ export function flattenLines(products: ProductListItem[]): Line[] {
         out.push({
           sizeId: s.id,
           productId: p.id,
+          variantId: v.id,
           product: p.name,
           code: p.code,
           variant: v.name,

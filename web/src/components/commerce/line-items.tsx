@@ -38,7 +38,71 @@ const DISCOUNT_OPTIONS = [
   { value: "AMOUNT", label: "Amount" },
 ]
 
-/** Search-and-pick over every stock unit in the catalog, including by barcode. */
+/** One style/colour, with every size it comes in. */
+interface VariantGroup {
+  key: string
+  product: string
+  variant: string
+  code: string | null
+  sizes: Line[]
+  available: number
+  unit: string
+  text: string
+}
+
+/** The sizes a variant is bought in, with how many of each. */
+export interface Pick {
+  line: Line
+  quantity: string
+}
+
+function groupByVariant(lines: Line[]): VariantGroup[] {
+  const byVariant = new Map<string, VariantGroup>()
+  for (const line of lines) {
+    const existing = byVariant.get(line.variantId)
+    if (existing) {
+      existing.sizes.push(line)
+      // Decimals arrive as strings; this total only labels the row, and the
+      // stored figures are always recomputed server-side.
+      existing.available += Number(line.totals.available) || 0
+      continue
+    }
+    byVariant.set(line.variantId, {
+      key: line.variantId,
+      product: line.product,
+      variant: line.variant,
+      code: line.code,
+      sizes: [line],
+      available: Number(line.totals.available) || 0,
+      unit: line.unit,
+      // Every size's SKUs and barcodes stay searchable, so typing one still
+      // finds the variant it belongs to.
+      text: line.text,
+    })
+  }
+  for (const group of byVariant.values()) {
+    if (group.sizes.length > 1) {
+      group.text = group.sizes.map((s) => s.text).join(" ")
+    }
+  }
+  return [...byVariant.values()]
+}
+
+/** A variant with one unnamed size is a single unit; there is nothing to pick. */
+const isSingleUnit = (group: VariantGroup) =>
+  group.sizes.length === 1 && group.sizes[0].label === "Default"
+
+/**
+ * Search by product or variant, then choose the sizes.
+ *
+ * Listing every size in the results is wrong for the way stock is actually
+ * bought and sold: a style comes in a size run, and a buyer wants S-M-L-XL of
+ * one colour in one go, not four searches for the same shirt. So the list is
+ * one row per variant, and picking one opens its sizes with a quantity each.
+ *
+ * A scanned barcode still identifies exactly one size, so it skips the size
+ * step and adds that line directly.
+ */
 function LinePicker({
   lines,
   onPick,
@@ -46,27 +110,57 @@ function LinePicker({
   inputRef,
 }: {
   lines: Line[]
-  onPick: (line: Line) => void
+  onPick: (picks: Pick[]) => void
   label: string
   inputRef?: React.RefObject<HTMLInputElement | null>
 }) {
   const [query, setQuery] = useState("")
   const [active, setActive] = useState(0)
+  const [chosen, setChosen] = useState<VariantGroup | null>(null)
+  const [qty, setQty] = useState<Record<string, string>>({})
   const listId = useId()
+
+  const groups = useMemo(() => groupByVariant(lines), [lines])
   const needle = query.trim().toLowerCase()
   const results = useMemo(
-    () => (needle ? lines.filter((l) => l.text.includes(needle)).slice(0, 8) : []),
-    [lines, needle]
+    () => (needle ? groups.filter((g) => g.text.includes(needle)).slice(0, 8) : []),
+    [groups, needle]
   )
 
   // A fresh set of hits means the old highlight is meaningless, and typing one
   // more letter must not leave the selection pointing past the end.
   const at = Math.min(active, Math.max(results.length - 1, 0))
 
-  const pick = (line: Line) => {
-    onPick(line)
+  const reset = () => {
     setQuery("")
     setActive(0)
+    setChosen(null)
+    setQty({})
+  }
+
+  const addOne = (line: Line) => {
+    onPick([{ line, quantity: "1" }])
+    reset()
+  }
+
+  const choose = (group: VariantGroup) => {
+    if (isSingleUnit(group)) {
+      addOne(group.sizes[0])
+      return
+    }
+    setChosen(group)
+    setQty({})
+  }
+
+  const confirm = () => {
+    if (!chosen) return
+    const picks = chosen.sizes
+      .filter((s) => Number(qty[s.sizeId]) > 0)
+      .map((s) => ({ line: s, quantity: qty[s.sizeId] }))
+    if (!picks.length) return
+    onPick(picks)
+    reset()
+    inputRef?.current?.focus()
   }
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -87,9 +181,16 @@ function LinePicker({
     if (event.key === "Enter") {
       event.preventDefault()
       event.stopPropagation()
-      pick(results[at])
+      choose(results[at])
     }
   }
+
+  const chosenTotal = chosen
+    ? chosen.sizes.reduce((sum, s) => sum + (Number(qty[s.sizeId]) || 0), 0)
+    : 0
+  const chosenCount = chosen
+    ? chosen.sizes.filter((s) => Number(qty[s.sizeId]) > 0).length
+    : 0
 
   return (
     <div className="space-y-2">
@@ -102,6 +203,7 @@ function LinePicker({
             onChange={(e) => {
               setQuery(e.target.value)
               setActive(0)
+              setChosen(null)
             }}
             onKeyDown={onKeyDown}
             placeholder={label}
@@ -118,30 +220,44 @@ function LinePicker({
           title="Scan to add a line"
           hint="Scan or type a barcode"
           onScan={(code) => {
+            // A barcode names one size exactly, so there is nothing to choose.
             const hit = lines.find((l) => l.barcodes.includes(code.trim()))
-            if (hit) pick(hit)
+            if (hit) addOne(hit)
             else setQuery(code)
           }}
         />
       </div>
 
-      {needle && !results.length ? (
+      {needle && !results.length && !chosen ? (
         <p className="text-sm text-muted-foreground">Nothing matches “{query}”.</p>
       ) : null}
 
-      {results.length ? (
+      {chosen ? (
+        <SizeChooser
+          group={chosen}
+          qty={qty}
+          onQty={setQty}
+          onBack={() => {
+            setChosen(null)
+            inputRef?.current?.focus()
+          }}
+          onConfirm={confirm}
+          count={chosenCount}
+          total={chosenTotal}
+        />
+      ) : results.length ? (
         <ul
           id={listId}
           role="listbox"
           aria-label={label}
           className="divide-y divide-border/60 overflow-hidden rounded-lg border border-border/70"
         >
-          {results.map((line, i) => (
-            <li key={line.sizeId} id={`${listId}-${i}`} role="option" aria-selected={i === at}>
+          {results.map((group, i) => (
+            <li key={group.key} id={`${listId}-${i}`} role="option" aria-selected={i === at}>
               <button
                 type="button"
                 tabIndex={-1}
-                onClick={() => pick(line)}
+                onClick={() => choose(group)}
                 // Hovering moves the highlight, so mouse and keyboard never
                 // disagree about which row Enter would take.
                 onMouseEnter={() => setActive(i)}
@@ -151,21 +267,166 @@ function LinePicker({
                 )}
               >
                 <span className="min-w-0">
-                  <span className="block truncate font-medium">{line.product}</span>
+                  <span className="block truncate font-medium">
+                    {group.product}
+                    <span className="text-muted-foreground"> · </span>
+                    {group.variant}
+                  </span>
                   <span className="block truncate text-xs text-muted-foreground">
-                    {line.variant}
-                    {line.label !== "Default" ? ` · ${line.label}` : ""}
-                    {line.sku ? ` · ${line.sku}` : ""}
+                    {isSingleUnit(group)
+                      ? "Single unit"
+                      : `${group.sizes.length} sizes · ${group.sizes
+                          .map((s) => s.label)
+                          .slice(0, 6)
+                          .join(", ")}${group.sizes.length > 6 ? "…" : ""}`}
                   </span>
                 </span>
                 <span className="shrink-0 font-mono text-xs text-muted-foreground">
-                  {fmtQty(line.totals.available)} {line.unit}
+                  {fmtQty(String(group.available))} {group.unit}
                 </span>
               </button>
             </li>
           ))}
         </ul>
       ) : null}
+    </div>
+  )
+}
+
+/**
+ * The size run of one variant. Quantities default to nothing so the buyer
+ * types only the sizes they actually want, and "All" fills every size with one
+ * for the common case of a full run.
+ */
+function SizeChooser({
+  group,
+  qty,
+  onQty,
+  onBack,
+  onConfirm,
+  count,
+  total,
+}: {
+  group: VariantGroup
+  qty: Record<string, string>
+  onQty: (next: Record<string, string>) => void
+  onBack: () => void
+  onConfirm: () => void
+  count: number
+  total: number
+}) {
+  const firstRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    firstRef.current?.focus()
+    firstRef.current?.select()
+  }, [group.key])
+
+  const set = (sizeId: string, value: string) => onQty({ ...qty, [sizeId]: value })
+  const fillAll = () =>
+    onQty(Object.fromEntries(group.sizes.map((s) => [s.sizeId, "1"])))
+
+  return (
+    <div
+      className="rounded-lg border border-border/70 bg-secondary/30 p-3"
+      onKeyDown={(e) => {
+        // The chooser owns these: Enter adds the run, Escape goes back to the
+        // search rather than closing the whole voucher.
+        if (e.key === "Enter") {
+          e.preventDefault()
+          e.stopPropagation()
+          onConfirm()
+        }
+        if (e.key === "Escape") {
+          e.preventDefault()
+          e.stopPropagation()
+          onBack()
+        }
+      }}
+    >
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-medium">
+            {group.product}
+            <span className="text-muted-foreground"> · </span>
+            {group.variant}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            How many of each size?
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          <Button type="button" variant="ghost" size="sm" onClick={fillAll}>
+            All
+          </Button>
+          <Button type="button" variant="ghost" size="sm" onClick={() => onQty({})}>
+            Clear
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Back to search"
+            onClick={onBack}
+          >
+            <XIcon className="size-4" />
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(5.5rem,1fr))] gap-2">
+        {group.sizes.map((size, i) => {
+          const value = qty[size.sizeId] ?? ""
+          const on = Number(value) > 0
+          return (
+            <div
+              key={size.sizeId}
+              className={cn(
+                "rounded-md border px-2 py-1.5 transition-colors",
+                on ? "border-brand/40 bg-brand-soft/40" : "border-border/70 bg-background"
+              )}
+            >
+              <label
+                htmlFor={`size-${size.sizeId}`}
+                className="block truncate text-xs font-medium"
+                title={size.label}
+              >
+                {size.label}
+              </label>
+              <Input
+                id={`size-${size.sizeId}`}
+                ref={i === 0 ? firstRef : undefined}
+                value={value}
+                onChange={(e) => set(size.sizeId, e.target.value)}
+                inputMode="decimal"
+                placeholder="0"
+                aria-label={`Quantity of ${size.label}`}
+                className="mt-1 h-7 px-1.5 text-center font-mono"
+              />
+              <p className="mt-1 truncate text-center text-[10px] text-muted-foreground">
+                {fmtQty(size.totals.available)} avail.
+              </p>
+            </div>
+          )
+        })}
+      </div>
+
+      <div className="mt-3 flex items-center justify-between gap-3">
+        <p className="text-xs text-muted-foreground">
+          {count
+            ? `${count} size${count === 1 ? "" : "s"} · ${fmtQty(String(total))} ${group.unit}`
+            : "Type a quantity against the sizes you want."}
+        </p>
+        <Button
+          type="button"
+          size="sm"
+          className="rounded-full"
+          disabled={!count}
+          onClick={onConfirm}
+        >
+          Add {count || ""} {count === 1 ? "line" : "lines"}
+        </Button>
+      </div>
     </div>
   )
 }
@@ -228,28 +489,35 @@ export function LineItemsEditor({
    */
   const nextKey = () => `${instance}-${(keySeq.current += 1)}`
 
-  const addLine = (line: Line) => {
-    const fresh: Row = {
+  /** A whole size run lands in one update, so the list never half-renders. */
+  const addLines = (picks: Pick[]) => {
+    const fresh: Row[] = picks.map(({ line, quantity }) => ({
       key: nextKey(),
       line,
-      quantity: "1",
+      quantity,
       price: defaultPriceOf?.(line) ?? line.sellPrice ?? "",
-      discountType: "NONE",
+      discountType: "NONE" as DiscountType,
       discount: "",
-    }
+    }))
+
     setRows((prev) => {
-      // Adding the same unit twice bumps the quantity instead of making a
-      // second row the server would treat as a separate line.
-      const at = prev.findIndex((r) => r.line?.sizeId === line.sizeId)
-      if (at >= 0) {
-        const next = [...prev]
-        next[at] = {
-          ...next[at],
-          quantity: String((Number(next[at].quantity) || 0) + 1),
+      const next = [...prev]
+      for (const row of fresh) {
+        // Adding the same unit twice adds to that row instead of making a
+        // second one the server would treat as a separate line.
+        const at = next.findIndex((r) => r.line?.sizeId === row.line?.sizeId)
+        if (at >= 0) {
+          next[at] = {
+            ...next[at],
+            quantity: String(
+              (Number(next[at].quantity) || 0) + (Number(row.quantity) || 0)
+            ),
+          }
+        } else {
+          next.push(row)
         }
-        return next
       }
-      return [...prev, fresh]
+      return next
     })
   }
 
@@ -266,7 +534,7 @@ export function LineItemsEditor({
     <div className="space-y-4">
       <LinePicker
         lines={lines}
-        onPick={addLine}
+        onPick={addLines}
         label="Search products, SKU or barcode"
         inputRef={searchRef}
       />
