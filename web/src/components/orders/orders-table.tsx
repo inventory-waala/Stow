@@ -14,6 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { EmptyRow, fmtMoney } from "@/components/inventory/primitives"
+import { SelectField } from "@/components/inventory/select-field"
 import { StatusBadge } from "@/components/commerce/status-badge"
 
 export function OrderFilters({
@@ -39,19 +40,19 @@ export function OrderFilters({
           aria-label="Search orders"
         />
       </div>
-      <select
+      <SelectField
         name="status"
         defaultValue={status ?? ""}
         aria-label="Filter by status"
-        className="h-9 rounded-md border border-input bg-transparent px-2 text-sm"
-      >
-        <option value="">All statuses</option>
-        {ORDER_STATUSES.map((s) => (
-          <option key={s} value={s}>
-            {s.charAt(0) + s.slice(1).toLowerCase()}
-          </option>
-        ))}
-      </select>
+        className="w-40"
+        options={[
+          { value: "", label: "All statuses" },
+          ...ORDER_STATUSES.map((s) => ({
+            value: s,
+            label: s.charAt(0) + s.slice(1).toLowerCase(),
+          })),
+        ]}
+      />
       <Input
         name="min_amount"
         defaultValue={minAmount}
