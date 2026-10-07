@@ -6,6 +6,8 @@ import {
   type Page,
   type SummarisedPage,
 } from "@/lib/service-client"
+import type { NewDeduction } from "@/lib/commerce/deductions"
+import type { Rounding } from "@/lib/commerce/totals"
 import type { PurchaseOrder, PurchaseStatus, Supplier } from "./types"
 
 export const VENDOR_SERVICE_URL = (
@@ -35,8 +37,10 @@ export interface NewPurchase {
   order_date?: string
   status?: PurchaseStatus
   items: NewPurchaseLine[]
-  discount_type?: string
-  discount?: string
+  /** The footer ladder, in the order it applies. */
+  deductions?: NewDeduction[]
+  rounding?: Rounding
+  rounding_precision?: string
   cgst_rate?: string
   sgst_rate?: string
   igst_rate?: string

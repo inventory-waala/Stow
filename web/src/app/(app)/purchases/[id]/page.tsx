@@ -116,9 +116,14 @@ export default async function PurchasePage({ params }: PageProps<"/purchases/[id
 
           <dl className="space-y-1.5 border-t border-border/70 p-5 text-sm">
             <Figure label="Subtotal" value={fmtMoney(po.subtotal, currency)} />
-            {Number(po.discount) ? (
-              <Figure label="Bill discount" value={`− ${fmtMoney(po.discount, currency)}`} />
-            ) : null}
+            {/* Each rung prints by its own name, in the order it applied. */}
+            {po.deductions?.map((d) => (
+              <Figure
+                key={d.id}
+                label={d.basis === "PERCENT" ? `${d.label} (${trim(d.value)}%)` : d.label}
+                value={`− ${fmtMoney(d.amount, currency)}`}
+              />
+            ))}
             <Figure label="Taxable" value={fmtMoney(po.taxable_amount, currency)} />
             {Number(po.cgst) ? (
               <Figure label={`CGST (${trim(po.cgst_rate)}%)`} value={fmtMoney(po.cgst, currency)} />
@@ -128,6 +133,9 @@ export default async function PurchasePage({ params }: PageProps<"/purchases/[id
             ) : null}
             {Number(po.igst) ? (
               <Figure label={`IGST (${trim(po.igst_rate)}%)`} value={fmtMoney(po.igst, currency)} />
+            ) : null}
+            {Number(po.round_off) ? (
+              <Figure label="Round off" value={fmtMoney(po.round_off, currency)} />
             ) : null}
             <div className="mt-2 border-t border-border/70 pt-2">
               <Figure label="Total" value={fmtMoney(po.total_amount, currency)} strong />

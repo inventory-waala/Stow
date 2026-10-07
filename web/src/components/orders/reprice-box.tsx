@@ -1,20 +1,20 @@
 "use client"
 
-import { useActionState } from "react"
+import { useActionState, useState } from "react"
 
 import { repriceOrder } from "@/lib/orders/actions"
 import { IS_REPRICEABLE, type Order } from "@/lib/orders/types"
+import { toLadderRows, trimZeros } from "@/lib/commerce/deductions"
+import type { Rounding } from "@/lib/commerce/totals"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { FormAlert } from "@/components/inventory/primitives"
 import { SelectField } from "@/components/inventory/select-field"
-
-const DISCOUNT_OPTIONS = [
-  { value: "NONE", label: "No discount" },
-  { value: "PERCENT", label: "%" },
-  { value: "AMOUNT", label: "Amount" },
-]
+import {
+  DeductionLadder,
+  type LadderRow,
+} from "@/components/commerce/deduction-ladder"
 
 /** "18.0000" → "18" so the input shows what someone would have typed. */
 const trim = (v: string) => {
@@ -24,11 +24,14 @@ const trim = (v: string) => {
 
 /**
  * The review gate. Lines are fixed by this point; what is still open is the
- * bill discount, the special discount agreed with the customer, and the tax
- * rates. Everything is recomputed server-side from the lines.
+ * footer ladder agreed with the customer and the tax rates. Everything is
+ * recomputed server-side from the lines, so this only posts the inputs.
  */
 export function RepriceBox({ order }: { order: Order }) {
   const [state, action, pending] = useActionState(repriceOrder, undefined)
+  const [ladder, setLadder] = useState<LadderRow[]>(() =>
+    toLadderRows(order.deductions ?? [])
+  )
 
   if (order.reserved_at || order.stock_posted_at) {
     return (
@@ -54,43 +57,36 @@ export function RepriceBox({ order }: { order: Order }) {
       <FormAlert state={state} />
 
       <div className="space-y-1.5">
-        <Label className="text-xs">Bill discount</Label>
-        <div className="flex gap-2">
-          <SelectField
-            name="discount_type"
-            options={DISCOUNT_OPTIONS}
-            defaultValue={order.discount_type}
-            aria-label="Bill discount type"
-            className="w-32"
-          />
-          <Input
-            name="discount"
-            inputMode="decimal"
-            defaultValue={trim(order.discount)}
-            placeholder="0"
-            aria-label="Bill discount value"
-          />
-        </div>
+        <Label className="text-xs">Deductions</Label>
+        <p className="text-xs text-muted-foreground">
+          Applied top to bottom; each takes its cut of what the one above left.
+        </p>
+        <DeductionLadder
+          rows={ladder}
+          onChange={setLadder}
+          currency={order.currency || "INR"}
+          disabled={pending}
+        />
       </div>
 
-      <div className="space-y-1.5">
-        <Label className="text-xs">Special discount</Label>
-        <div className="flex gap-2">
-          <SelectField
-            name="special_discount_type"
-            options={DISCOUNT_OPTIONS}
-            defaultValue={order.special_discount_type}
-            aria-label="Special discount type"
-            className="w-32"
-          />
-          <Input
-            name="special_discount"
-            inputMode="decimal"
-            defaultValue={trim(order.special_discount)}
-            placeholder="0"
-            aria-label="Special discount value"
-          />
-        </div>
+      <div className="space-y-1">
+        <Label className="text-xs">Round the total</Label>
+        <SelectField
+          name="rounding"
+          options={[
+            { value: "NONE", label: "No rounding" },
+            { value: "NORMAL", label: "Nearest rupee" },
+            { value: "UP", label: "Always up" },
+            { value: "DOWN", label: "Always down" },
+          ]}
+          defaultValue={(order.rounding ?? "NONE") as Rounding}
+          aria-label="Rounding"
+        />
+        <input
+          type="hidden"
+          name="rounding_precision"
+          value={trimZeros(order.rounding_precision ?? "1")}
+        />
       </div>
 
       <div className="grid grid-cols-3 gap-2">

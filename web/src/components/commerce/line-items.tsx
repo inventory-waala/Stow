@@ -9,6 +9,7 @@ import {
   previewTotals,
   type DiscountType,
   type PreviewTotals,
+  type Rounding,
 } from "@/lib/commerce/totals"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -16,6 +17,10 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { SelectField } from "@/components/inventory/select-field"
 import { ScanButton } from "@/components/inventory/scanner/scan-button"
+import {
+  DeductionLadder,
+  type LadderRow,
+} from "@/components/commerce/deduction-ladder"
 import { fmtQty } from "@/components/inventory/primitives"
 
 export interface Row {
@@ -135,22 +140,17 @@ export function LineItemsEditor({
   priceField,
   priceLabel,
   currency = "INR",
-  withSpecialDiscount = false,
   defaultPriceOf,
 }: {
   lines: Line[]
   priceField: "unit_price" | "rate"
   priceLabel: string
   currency?: string
-  /** Sales orders carry a second discount settled at review time. */
-  withSpecialDiscount?: boolean
   defaultPriceOf?: (line: Line) => string
 }) {
   const [rows, setRows] = useState<Row[]>([])
-  const [discountType, setDiscountType] = useState<DiscountType>("NONE")
-  const [discount, setDiscount] = useState("")
-  const [specialDiscountType, setSpecialDiscountType] = useState<DiscountType>("NONE")
-  const [specialDiscount, setSpecialDiscount] = useState("")
+  const [ladder, setLadder] = useState<LadderRow[]>([])
+  const [rounding, setRounding] = useState<Rounding>("NONE")
   const [cgstRate, setCgstRate] = useState("")
   const [sgstRate, setSgstRate] = useState("")
   const [igstRate, setIgstRate] = useState("")
@@ -162,13 +162,11 @@ export function LineItemsEditor({
       discountType: r.discountType,
       discount: r.discount,
     })),
-    discountType,
-    discount,
-    specialDiscountType: withSpecialDiscount ? specialDiscountType : "NONE",
-    specialDiscount: withSpecialDiscount ? specialDiscount : "0",
+    deductions: ladder,
     cgstRate,
     sgstRate,
     igstRate,
+    rounding,
   })
 
   const addLine = (line: Line) =>
@@ -293,55 +291,38 @@ export function LineItemsEditor({
       )}
 
       {/* ── Bill level ─────────────────────────────────────────────────── */}
-      <div className="grid gap-4 rounded-lg border border-border/70 p-4 sm:grid-cols-2">
+      <div className="grid gap-4 rounded-lg border border-border/70 p-4">
+        <div className="space-y-2">
+          <Label className="text-xs">Deductions</Label>
+          <p className="text-xs text-muted-foreground">
+            Applied top to bottom; each takes its cut of what the one above
+            left.
+          </p>
+          <DeductionLadder
+            rows={ladder}
+            onChange={setLadder}
+            amounts={totals.deductionAmounts}
+            currency={currency}
+          />
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-3">
           <div className="space-y-1">
-            <Label className="text-xs">Bill discount</Label>
-            <div className="flex gap-2">
-              <SelectField
-                name="discount_type"
-                options={DISCOUNT_OPTIONS}
-                value={discountType}
-                onValueChange={(v) => setDiscountType(v as DiscountType)}
-                aria-label="Bill discount type"
-                className="w-36"
-              />
-              <Input
-                name="discount"
-                inputMode="decimal"
-                value={discount}
-                onChange={(e) => setDiscount(e.target.value)}
-                disabled={discountType === "NONE"}
-                placeholder="0"
-                aria-label="Bill discount value"
-              />
-            </div>
+            <Label className="text-xs">Round the total</Label>
+            <SelectField
+              name="rounding"
+              options={[
+                { value: "NONE", label: "No rounding" },
+                { value: "NORMAL", label: "Nearest rupee" },
+                { value: "UP", label: "Always up" },
+                { value: "DOWN", label: "Always down" },
+              ]}
+              value={rounding}
+              onValueChange={(v) => setRounding(v as Rounding)}
+              aria-label="Rounding"
+            />
           </div>
-
-          {withSpecialDiscount ? (
-            <div className="space-y-1">
-              <Label className="text-xs">Special discount</Label>
-              <div className="flex gap-2">
-                <SelectField
-                  name="special_discount_type"
-                  options={DISCOUNT_OPTIONS}
-                  value={specialDiscountType}
-                  onValueChange={(v) => setSpecialDiscountType(v as DiscountType)}
-                  aria-label="Special discount type"
-                  className="w-36"
-                />
-                <Input
-                  name="special_discount"
-                  inputMode="decimal"
-                  value={specialDiscount}
-                  onChange={(e) => setSpecialDiscount(e.target.value)}
-                  disabled={specialDiscountType === "NONE"}
-                  placeholder="0"
-                  aria-label="Special discount value"
-                />
-              </div>
-            </div>
-          ) : null}
 
           <div className="grid grid-cols-3 gap-2">
             {(
@@ -368,23 +349,27 @@ export function LineItemsEditor({
 
         <dl className="space-y-1.5 text-sm">
           <Figure label="Subtotal" value={fmtAmount(totals.subtotal, currency)} />
-          {totals.discount ? (
-            <Figure label="Bill discount" value={`− ${fmtAmount(totals.discount, currency)}`} />
-          ) : null}
-          {withSpecialDiscount && totals.specialDiscount ? (
-            <Figure
-              label="Special discount"
-              value={`− ${fmtAmount(totals.specialDiscount, currency)}`}
-            />
-          ) : null}
+          {ladder.map((row, i) =>
+            totals.deductionAmounts[i] ? (
+              <Figure
+                key={row.key}
+                label={row.label || "Deduction"}
+                value={`− ${fmtAmount(totals.deductionAmounts[i], currency)}`}
+              />
+            ) : null
+          )}
           <Figure label="Taxable" value={fmtAmount(totals.taxable, currency)} />
           {totals.cgst ? <Figure label="CGST" value={fmtAmount(totals.cgst, currency)} /> : null}
           {totals.sgst ? <Figure label="SGST" value={fmtAmount(totals.sgst, currency)} /> : null}
           {totals.igst ? <Figure label="IGST" value={fmtAmount(totals.igst, currency)} /> : null}
+          {totals.roundOff ? (
+            <Figure label="Round off" value={fmtAmount(totals.roundOff, currency)} />
+          ) : null}
           <div className="mt-2 border-t border-border/70 pt-2">
             <Figure label="Total" value={fmtAmount(totals.total, currency)} strong />
           </div>
         </dl>
+        </div>
       </div>
     </div>
   )

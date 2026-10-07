@@ -1,3 +1,8 @@
+import type {
+  Deduction,
+  Rounding,
+} from "@/lib/commerce/totals"
+
 export type DiscountType = "NONE" | "PERCENT" | "AMOUNT"
 
 export type OrderStatus =
@@ -49,14 +54,15 @@ export interface Order {
   status: OrderStatus
   order_date: string
   subtotal: string
-  discount_type: DiscountType
+  /** Sum of every rung in `deductions`. */
   discount: string
-  special_discount_type: DiscountType
-  special_discount: string
   taxable_amount: string
   cgst: string
   sgst: string
   igst: string
+  round_off: string
+  rounding: Rounding
+  rounding_precision: string
   total_amount: string
   cgst_rate: string
   sgst_rate: string
@@ -70,6 +76,7 @@ export interface Order {
   fulfilled_at: string | null
   created_at: string
   customer: Customer
+  deductions: Deduction[]
   items: OrderItem[]
 }
 
@@ -115,3 +122,10 @@ export const CANCELLABLE: OrderStatus[] = [
 
 /** The stage where the special discount is meant to be settled. */
 export const IS_REPRICEABLE: OrderStatus[] = ["DRAFT", "PENDING", "REVIEW"]
+
+export type {
+  Deduction,
+  DeductionBase,
+  DeductionBasis,
+  Rounding,
+} from "@/lib/commerce/totals"

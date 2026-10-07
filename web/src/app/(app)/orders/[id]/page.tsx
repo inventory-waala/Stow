@@ -118,15 +118,14 @@ export default async function OrderPage({ params }: PageProps<"/orders/[id]">) {
 
           <dl className="space-y-1.5 border-t border-border/70 p-5 text-sm">
             <Figure label="Subtotal" value={fmtMoney(o.subtotal, currency)} />
-            {Number(o.discount) ? (
-              <Figure label="Bill discount" value={`− ${fmtMoney(o.discount, currency)}`} />
-            ) : null}
-            {Number(o.special_discount) ? (
+            {/* Each rung prints by its own name, in the order it applied. */}
+            {o.deductions?.map((d) => (
               <Figure
-                label="Special discount"
-                value={`− ${fmtMoney(o.special_discount, currency)}`}
+                key={d.id}
+                label={d.basis === "PERCENT" ? `${d.label} (${trim(d.value)}%)` : d.label}
+                value={`− ${fmtMoney(d.amount, currency)}`}
               />
-            ) : null}
+            ))}
             <Figure label="Taxable" value={fmtMoney(o.taxable_amount, currency)} />
             {Number(o.cgst) ? (
               <Figure label={`CGST (${trim(o.cgst_rate)}%)`} value={fmtMoney(o.cgst, currency)} />
@@ -136,6 +135,9 @@ export default async function OrderPage({ params }: PageProps<"/orders/[id]">) {
             ) : null}
             {Number(o.igst) ? (
               <Figure label={`IGST (${trim(o.igst_rate)}%)`} value={fmtMoney(o.igst, currency)} />
+            ) : null}
+            {Number(o.round_off) ? (
+              <Figure label="Round off" value={fmtMoney(o.round_off, currency)} />
             ) : null}
             <div className="mt-2 border-t border-border/70 pt-2">
               <Figure label="Total" value={fmtMoney(o.total_amount, currency)} strong />

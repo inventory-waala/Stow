@@ -1,3 +1,8 @@
+import type {
+  Deduction,
+  Rounding,
+} from "@/lib/commerce/totals"
+
 export type DiscountType = "NONE" | "PERCENT" | "AMOUNT"
 
 export type PurchaseStatus =
@@ -50,12 +55,15 @@ export interface PurchaseOrder {
   status: PurchaseStatus
   order_date: string
   subtotal: string
-  discount_type: DiscountType
+  /** Sum of every rung in `deductions`. */
   discount: string
   taxable_amount: string
   cgst: string
   sgst: string
   igst: string
+  round_off: string
+  rounding: Rounding
+  rounding_precision: string
   total_amount: string
   /** Derived by the service from the stored amounts, to repopulate the form. */
   cgst_rate: string
@@ -69,6 +77,7 @@ export interface PurchaseOrder {
   stock_posted_at: string | null
   created_at: string
   supplier: Supplier
+  deductions: Deduction[]
   items: PurchaseItem[]
 }
 
@@ -92,3 +101,10 @@ export const SETTABLE_STATUSES: Record<PurchaseStatus, PurchaseStatus[]> = {
 }
 
 export const RECEIVABLE: PurchaseStatus[] = ["DRAFT", "PENDING", "ORDERED", "APPROVED"]
+
+export type {
+  Deduction,
+  DeductionBase,
+  DeductionBasis,
+  Rounding,
+} from "@/lib/commerce/totals"

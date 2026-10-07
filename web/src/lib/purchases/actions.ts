@@ -5,6 +5,7 @@ import { z } from "zod"
 
 import { requireToken } from "@/lib/inventory/data"
 import { nest, rows } from "@/lib/inventory/form-data"
+import { asRounding, readDeductions } from "@/lib/commerce/deductions"
 import { describeError } from "./data"
 import { vendorApi, type NewPurchaseLine } from "./vendor-service"
 import type { PurchaseStatus } from "./types"
@@ -153,7 +154,7 @@ const purchaseHeadSchema = z.object({
   notes: optionalStr,
   remarks: optionalStr,
   location_id: optionalStr,
-  discount: z
+  rounding_precision: z
     .string()
     .trim()
     .optional()
@@ -181,11 +182,15 @@ export async function createPurchase(
     return { error: "Add at least one line with a quantity", field: "items" }
   }
 
-  const discountType = DISCOUNT_TYPES.includes(
-    (data.discount_type as string) as never
-  )
-    ? ((data.discount_type as string) as (typeof DISCOUNT_TYPES)[number])
-    : "NONE"
+  let deductions
+  try {
+    deductions = readDeductions(data)
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : "Check the deductions",
+      field: "deductions",
+    }
+  }
   const status = String(data.status ?? "DRAFT") as PurchaseStatus
 
   try {
@@ -194,9 +199,8 @@ export async function createPurchase(
       ...parsed.data,
       status,
       items,
-      ...(discountType !== "NONE"
-        ? { discount_type: discountType, discount: parsed.data.discount ?? "0" }
-        : { discount_type: "NONE", discount: undefined }),
+      deductions,
+      rounding: asRounding(data.rounding),
     })
     revalidatePath("/purchases")
     return {

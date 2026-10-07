@@ -154,7 +154,6 @@ export function NewOrderDialog({
               lines={lines}
               priceField="rate"
               priceLabel="Rate"
-              withSpecialDiscount
             />
             <p className="text-xs text-muted-foreground">
               Leave a rate blank to use the catalog sell price.

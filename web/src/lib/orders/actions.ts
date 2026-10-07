@@ -5,6 +5,7 @@ import { z } from "zod"
 
 import { requireToken } from "@/lib/inventory/data"
 import { nest, rows } from "@/lib/inventory/form-data"
+import { asRounding, readDeductions } from "@/lib/commerce/deductions"
 import { describeError } from "./data"
 import { transactionApi, type NewOrderLine } from "./transaction-service"
 import type { OrderStatus } from "./types"
@@ -166,12 +167,7 @@ const orderHeadSchema = z.object({
   notes: optionalStr,
   remarks: optionalStr,
   location_id: optionalStr,
-  discount: z
-    .string()
-    .trim()
-    .optional()
-    .transform((v) => v || undefined),
-  special_discount: z
+  rounding_precision: z
     .string()
     .trim()
     .optional()
@@ -199,8 +195,15 @@ export async function createOrder(
     return { error: "Add at least one line with a quantity", field: "items" }
   }
 
-  const discountType = asDiscount(data.discount_type)
-  const specialType = asDiscount(data.special_discount_type)
+  let deductions
+  try {
+    deductions = readDeductions(data)
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : "Check the deductions",
+      field: "deductions",
+    }
+  }
 
   try {
     const token = await requireToken()
@@ -208,10 +211,8 @@ export async function createOrder(
       ...parsed.data,
       status: String(data.status ?? "DRAFT") as OrderStatus,
       items,
-      discount_type: discountType,
-      ...(discountType === "NONE" ? { discount: undefined } : {}),
-      special_discount_type: specialType,
-      ...(specialType === "NONE" ? { special_discount: undefined } : {}),
+      deductions,
+      rounding: asRounding(data.rounding),
     })
     revalidatePath("/orders")
     return { success: `${order.invoice_no} created`, id: order.id }
@@ -221,9 +222,9 @@ export async function createOrder(
 }
 
 /**
- * Settles the figures during the REVIEW stage: the special discount, the bill
- * discount and the tax rates. The service recomputes every total from the
- * lines, so this only sends the inputs.
+ * Settles the figures during the REVIEW stage: the footer ladder and the tax
+ * rates. The service recomputes every total from the lines, so this only sends
+ * the inputs.
  *
  * Refused once stock is reserved — the lines are what was held — which is why
  * repricing is meant to happen before the order is confirmed.
@@ -235,14 +236,10 @@ export async function repriceOrder(
   const id = String(formData.get("id") ?? "")
   if (!id) return { error: "Missing order" }
 
+  const data = nest(formData)
   const parsed = z
     .object({
-      discount: z
-        .string()
-        .trim()
-        .optional()
-        .transform((v) => v || undefined),
-      special_discount: z
+      rounding_precision: z
         .string()
         .trim()
         .optional()
@@ -251,20 +248,26 @@ export async function repriceOrder(
       sgst_rate: rate,
       igst_rate: rate,
     })
-    .safeParse(Object.fromEntries(formData))
+    .safeParse(data)
   if (!parsed.success) return firstIssue(parsed.error)
 
-  const discountType = asDiscount(formData.get("discount_type"))
-  const specialType = asDiscount(formData.get("special_discount_type"))
+  let deductions
+  try {
+    deductions = readDeductions(data)
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : "Check the deductions",
+      field: "deductions",
+    }
+  }
 
   try {
     const token = await requireToken()
     await transactionApi.updateOrder(token, id, {
       ...parsed.data,
-      discount_type: discountType,
-      ...(discountType === "NONE" ? { discount: "0" } : {}),
-      special_discount_type: specialType,
-      ...(specialType === "NONE" ? { special_discount: "0" } : {}),
+      // Always sent, so clearing every rung actually clears the ladder.
+      deductions,
+      rounding: asRounding(data.rounding),
     })
     revalidatePath("/orders")
     revalidatePath(`/orders/${id}`)
