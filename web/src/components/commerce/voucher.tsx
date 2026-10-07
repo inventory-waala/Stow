@@ -107,8 +107,13 @@ export function useEnterAdvances() {
     // person is choosing something, not typing.
     if (tag === "textarea" || tag === "button" || tag === "a") return
     if (target.getAttribute("role") === "combobox") return
+    // A select popup is portalled, but React still bubbles its events through
+    // the React tree to this form. Enter in there is choosing an option, which
+    // the select itself handles.
+    if (target.closest('[role="listbox"], [role="option"], [role="dialog"]')) {
+      return
+    }
 
-    event.preventDefault()
     const form = event.currentTarget
     const fields = Array.from(
       form.querySelectorAll<HTMLElement>(
@@ -116,7 +121,14 @@ export function useEnterAdvances() {
       )
     ).filter((el) => el.offsetParent !== null)
 
+    // Only act for something that is actually one of the fields. Without this
+    // an unknown target gives indexOf -1, and fields[-1 + 1] is the *first*
+    // field — so Enter anywhere unexpected threw the caret back to the top of
+    // the voucher.
     const at = fields.indexOf(target)
+    if (at === -1) return
+
+    event.preventDefault()
     const next = fields[at + 1]
     if (next) {
       next.focus()
