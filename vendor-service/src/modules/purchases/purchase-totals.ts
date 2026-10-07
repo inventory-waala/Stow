@@ -1,5 +1,18 @@
-import { applyDiscount, D, dec, Decimal, money, ZERO } from '../../common/money';
-import { DiscountType } from '../../../generated/prisma/client';
+import {
+  applyDiscount,
+  D,
+  dec,
+  Decimal,
+  money,
+  roundOff,
+  type Rounding,
+  ZERO,
+} from '../../common/money';
+import {
+  DeductionBase,
+  DeductionBasis,
+  DiscountType,
+} from '../../../generated/prisma/client';
 
 export interface LineInput {
   quantity: string;
@@ -16,24 +29,48 @@ export interface LineTotals {
   total_price: Decimal;
 }
 
+/** One rung of the footer ladder as the client sends it. */
+export interface DeductionInput {
+  code: string;
+  label: string;
+  basis: DeductionBasis;
+  applies_to?: DeductionBase;
+  value: string;
+  params?: Record<string, unknown>;
+}
+
+export interface DeductionTotals {
+  sequence: number;
+  code: string;
+  label: string;
+  basis: DeductionBasis;
+  applies_to: DeductionBase;
+  value: Decimal;
+  amount: Decimal;
+  params: Record<string, unknown>;
+}
+
 export interface DocumentTotals {
   lines: LineTotals[];
+  deductions: DeductionTotals[];
   subtotal: Decimal;
   discount: Decimal;
   taxable_amount: Decimal;
   cgst: Decimal;
   sgst: Decimal;
   igst: Decimal;
+  round_off: Decimal;
   total_amount: Decimal;
 }
 
 export interface DocumentInput {
   items: LineInput[];
-  discount_type?: DiscountType;
-  discount?: string;
+  deductions?: DeductionInput[];
   cgst_rate?: string;
   sgst_rate?: string;
   igst_rate?: string;
+  rounding?: Rounding;
+  rounding_precision?: string;
 }
 
 /**
@@ -43,9 +80,9 @@ export interface DocumentInput {
  * document cannot disagree with its own lines. justanidea computed these in the
  * browser and persisted whatever arrived.
  *
- * Order of operations: line discount, then bill discount on the line sum, then
- * tax on what remains. Tax is therefore charged on the discounted value, which
- * is what GST requires.
+ * Order of operations: line discount, then the footer ladder in sequence, then
+ * tax on what remains, then rounding. Tax is therefore charged on the
+ * discounted value, which is what GST requires.
  */
 export function computeTotals(input: DocumentInput): DocumentTotals {
   const lines: LineTotals[] = input.items.map((item) => {
@@ -70,26 +107,76 @@ export function computeTotals(input: DocumentInput): DocumentTotals {
     lines.reduce((sum, l) => sum.add(l.total_price), ZERO as Decimal),
   );
 
-  const billDiscount = applyDiscount(subtotal, {
-    type: input.discount_type ?? 'NONE',
-    value: dec(input.discount),
-  });
-
-  const taxable = money(subtotal.sub(billDiscount));
+  const { deductions, taxable } = applyLadder(subtotal, input.deductions ?? []);
+  const discount = money(
+    deductions.reduce((sum, d) => sum.add(d.amount), ZERO as Decimal),
+  );
 
   const rate = (value?: string) => D.min(D.max(dec(value), 0), 100);
   const cgst = money(taxable.mul(rate(input.cgst_rate)).div(100));
   const sgst = money(taxable.mul(rate(input.sgst_rate)).div(100));
   const igst = money(taxable.mul(rate(input.igst_rate)).div(100));
 
+  const payable = money(taxable.add(cgst).add(sgst).add(igst));
+  const round = roundOff(
+    payable,
+    input.rounding ?? 'NONE',
+    input.rounding_precision ? dec(input.rounding_precision) : new D(1),
+  );
+
   return {
     lines,
+    deductions,
     subtotal,
-    discount: billDiscount,
+    discount,
     taxable_amount: taxable,
     cgst,
     sgst,
     igst,
-    total_amount: money(taxable.add(cgst).add(sgst).add(igst)),
+    round_off: round,
+    total_amount: money(payable.add(round)),
   };
+}
+
+/**
+ * Walks the footer rungs in the order they were given.
+ *
+ * A RUNNING percentage takes its cut of what is left, so 10% then 5% then 2%
+ * leaves 83.79% of the subtotal rather than 83% — stacked trade terms are
+ * quoted that way and the difference is real money. Each rung is clamped to
+ * the balance still standing, so no ladder can drive a bill below zero however
+ * the form is filled.
+ */
+function applyLadder(
+  subtotal: Decimal,
+  inputs: DeductionInput[],
+): { deductions: DeductionTotals[]; taxable: Decimal } {
+  let running = subtotal;
+  const deductions: DeductionTotals[] = [];
+
+  inputs.forEach((input, index) => {
+    const base = input.applies_to === 'GROSS' ? subtotal : running;
+    const value = dec(input.value);
+    const amount =
+      input.basis === 'PERCENT'
+        ? money(base.mul(D.min(D.max(value, 0), 100)).div(100))
+        : D.min(D.max(value, 0), base);
+    // A GROSS rung can exceed what earlier rungs left; never go negative.
+    const capped = D.min(amount, running);
+
+    deductions.push({
+      sequence: index,
+      code: input.code,
+      label: input.label,
+      basis: input.basis,
+      applies_to: input.applies_to ?? 'RUNNING',
+      value,
+      amount: money(capped),
+      params: input.params ?? {},
+    });
+
+    running = money(running.sub(capped));
+  });
+
+  return { deductions, taxable: running };
 }

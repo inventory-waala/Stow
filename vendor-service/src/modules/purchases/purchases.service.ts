@@ -39,6 +39,9 @@ const RECEIVABLE: PurchaseStatus[] = ['DRAFT', 'PENDING', 'ORDERED', 'APPROVED']
 const PURCHASE_INCLUDE = {
   supplier: true,
   items: { orderBy: { created_at: 'asc' } },
+  // Ladder order is arithmetic: the footer has to read back the way it was
+  // computed, so never rely on insertion order.
+  deductions: { orderBy: { sequence: 'asc' } },
 } satisfies Prisma.PurchaseOrderInclude;
 
 @Injectable()
@@ -141,17 +144,32 @@ export class PurchasesService {
           status: dto.status ?? 'DRAFT',
           order_date: dto.order_date ? new Date(dto.order_date) : new Date(),
           subtotal: totals.subtotal,
-          discount_type: dto.discount_type ?? 'NONE',
           discount: totals.discount,
           taxable_amount: totals.taxable_amount,
           cgst: totals.cgst,
           sgst: totals.sgst,
           igst: totals.igst,
+          round_off: totals.round_off,
+          rounding: dto.rounding ?? 'NONE',
+          rounding_precision: dec(dto.rounding_precision ?? '1'),
           total_amount: totals.total_amount,
           notes: dto.notes,
           remarks: dto.remarks,
           location_id: dto.location_id,
           created_by: userId,
+          deductions: {
+            create: totals.deductions.map((d) => ({
+              tenant_id: tenantId,
+              sequence: d.sequence,
+              code: d.code,
+              label: d.label,
+              basis: d.basis,
+              applies_to: d.applies_to,
+              value: d.value,
+              amount: d.amount,
+              params: d.params as Prisma.InputJsonValue,
+            })),
+          },
           items: {
             create: totals.lines.map((line, i) => ({
               tenant_id: tenantId,
@@ -212,8 +230,21 @@ export class PurchasesService {
           discount_type: i.discount_type,
           discount: i.discount.toString(),
         })),
-      discount_type: dto.discount_type ?? existing.discount_type,
-      discount: dto.discount ?? existing.discount.toString(),
+      // A ladder is replaced whole or left alone; patching one rung in place
+      // would make the sequence ambiguous.
+      deductions:
+        dto.deductions ??
+        existing.deductions.map((d) => ({
+          code: d.code,
+          label: d.label,
+          basis: d.basis,
+          applies_to: d.applies_to,
+          value: d.value.toString(),
+          params: d.params as Record<string, unknown>,
+        })),
+      rounding: dto.rounding ?? existing.rounding,
+      rounding_precision:
+        dto.rounding_precision ?? existing.rounding_precision.toString(),
       cgst_rate: dto.cgst_rate ?? rateOf(existing.cgst, existing.taxable_amount),
       sgst_rate: dto.sgst_rate ?? rateOf(existing.sgst, existing.taxable_amount),
       igst_rate: dto.igst_rate ?? rateOf(existing.igst, existing.taxable_amount),
@@ -240,6 +271,25 @@ export class PurchasesService {
             })),
           });
         }
+        // Always rewritten: the amounts depend on the lines, so even an
+        // untouched ladder resolves to new figures when the items change.
+        await tx.purchaseDeduction.deleteMany({ where: { purchase_id: id } });
+        if (totals.deductions.length) {
+          await tx.purchaseDeduction.createMany({
+            data: totals.deductions.map((d) => ({
+              tenant_id: tenantId,
+              purchase_id: id,
+              sequence: d.sequence,
+              code: d.code,
+              label: d.label,
+              basis: d.basis,
+              applies_to: d.applies_to,
+              value: d.value,
+              amount: d.amount,
+              params: d.params as Prisma.InputJsonValue,
+            })),
+          });
+        }
         return tx.purchaseOrder.update({
           where: { id },
           data: {
@@ -251,13 +301,17 @@ export class PurchasesService {
             ...(dto.location_id !== undefined
               ? { location_id: dto.location_id }
               : {}),
-            ...(dto.discount_type ? { discount_type: dto.discount_type } : {}),
+            ...(dto.rounding ? { rounding: dto.rounding } : {}),
+            ...(dto.rounding_precision
+              ? { rounding_precision: dec(dto.rounding_precision) }
+              : {}),
             subtotal: totals.subtotal,
             discount: totals.discount,
             taxable_amount: totals.taxable_amount,
             cgst: totals.cgst,
             sgst: totals.sgst,
             igst: totals.igst,
+            round_off: totals.round_off,
             total_amount: totals.total_amount,
           },
           include: PURCHASE_INCLUDE,
@@ -472,10 +526,17 @@ function serialize(purchase: any) {
     cgst: str(dec(purchase.cgst?.toString())),
     sgst: str(dec(purchase.sgst?.toString())),
     igst: str(dec(purchase.igst?.toString())),
+    round_off: str(dec(purchase.round_off?.toString())),
+    rounding_precision: str(dec(purchase.rounding_precision?.toString())),
     total_amount: str(dec(purchase.total_amount?.toString())),
     cgst_rate: rateOf(purchase.cgst, purchase.taxable_amount),
     sgst_rate: rateOf(purchase.sgst, purchase.taxable_amount),
     igst_rate: rateOf(purchase.igst, purchase.taxable_amount),
+    deductions: (purchase.deductions ?? []).map((d: any) => ({
+      ...d,
+      value: str(dec(d.value?.toString())),
+      amount: str(dec(d.amount?.toString())),
+    })),
     items: (purchase.items ?? []).map((item: any) => ({
       ...item,
       quantity: str(dec(item.quantity?.toString())),
