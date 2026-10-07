@@ -38,3 +38,29 @@ export function applyDiscount(base: Decimal, discount: Discount): Decimal {
   }
   return D.min(D.max(discount.value, 0), base);
 }
+
+export type Rounding = 'NONE' | 'NORMAL' | 'UP' | 'DOWN';
+
+/**
+ * The signed adjustment that takes `total` to the nearest `precision`.
+ *
+ * Returned rather than applied so the figure can be stored: an invoice has to
+ * reconcile against what the customer was charged, and "round off" is a line
+ * they can see.
+ */
+export function roundOff(
+  total: Decimal,
+  mode: Rounding,
+  precision: Decimal,
+): Decimal {
+  if (mode === 'NONE' || precision.lte(0)) return ZERO;
+  const units = total.div(precision);
+  const rounded = (
+    mode === 'UP'
+      ? units.ceil()
+      : mode === 'DOWN'
+        ? units.floor()
+        : units.toDecimalPlaces(0, D.ROUND_HALF_UP)
+  ).mul(precision);
+  return money(rounded.sub(total));
+}

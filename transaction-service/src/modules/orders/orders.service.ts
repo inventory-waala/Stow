@@ -53,6 +53,9 @@ const FULFILLABLE: OrderStatus[] = ['CONFIRMED', 'APPROVED', 'PENDING'];
 const ORDER_INCLUDE = {
   customer: true,
   items: { orderBy: { created_at: 'asc' } },
+  // Ladder order is arithmetic: the footer has to read back the way it was
+  // computed, so never rely on insertion order.
+  deductions: { orderBy: { sequence: 'asc' } },
 } satisfies Prisma.OrderInclude;
 
 @Injectable()
@@ -157,19 +160,32 @@ export class OrdersService {
           status: dto.status ?? 'DRAFT',
           order_date: dto.order_date ? new Date(dto.order_date) : new Date(),
           subtotal: totals.subtotal,
-          discount_type: dto.discount_type ?? 'NONE',
           discount: totals.discount,
-          special_discount_type: dto.special_discount_type ?? 'NONE',
-          special_discount: totals.special_discount,
           taxable_amount: totals.taxable_amount,
           cgst: totals.cgst,
           sgst: totals.sgst,
           igst: totals.igst,
+          round_off: totals.round_off,
+          rounding: dto.rounding ?? 'NONE',
+          rounding_precision: dec(dto.rounding_precision ?? '1'),
           total_amount: totals.total_amount,
           notes: dto.notes,
           remarks: dto.remarks,
           location_id: dto.location_id,
           created_by: userId,
+          deductions: {
+            create: totals.deductions.map((d) => ({
+              tenant_id: tenantId,
+              sequence: d.sequence,
+              code: d.code,
+              label: d.label,
+              basis: d.basis,
+              applies_to: d.applies_to,
+              value: d.value,
+              amount: d.amount,
+              params: d.params as Prisma.InputJsonValue,
+            })),
+          },
           items: {
             create: totals.lines.map((line, i) => ({
               tenant_id: tenantId,
@@ -238,12 +254,21 @@ export class OrdersService {
           discount_type: i.discount_type,
           discount: i.discount.toString(),
         })),
-      discount_type: dto.discount_type ?? existing.discount_type,
-      discount: dto.discount ?? existing.discount.toString(),
-      special_discount_type:
-        dto.special_discount_type ?? existing.special_discount_type,
-      special_discount:
-        dto.special_discount ?? existing.special_discount.toString(),
+      // A ladder is replaced whole or left alone; patching one rung in place
+      // would make the sequence ambiguous.
+      deductions:
+        dto.deductions ??
+        existing.deductions.map((d) => ({
+          code: d.code,
+          label: d.label,
+          basis: d.basis,
+          applies_to: d.applies_to,
+          value: d.value.toString(),
+          params: d.params as Record<string, unknown>,
+        })),
+      rounding: dto.rounding ?? existing.rounding,
+      rounding_precision:
+        dto.rounding_precision ?? existing.rounding_precision.toString(),
       cgst_rate:
         dto.cgst_rate ?? rateOf(existing.cgst, existing.taxable_amount),
       sgst_rate:
@@ -273,6 +298,25 @@ export class OrdersService {
             })),
           });
         }
+        // Always rewritten: the amounts depend on the lines, so even an
+        // untouched ladder resolves to new figures when the items change.
+        await tx.orderDeduction.deleteMany({ where: { order_id: id } });
+        if (totals.deductions.length) {
+          await tx.orderDeduction.createMany({
+            data: totals.deductions.map((d) => ({
+              tenant_id: tenantId,
+              order_id: id,
+              sequence: d.sequence,
+              code: d.code,
+              label: d.label,
+              basis: d.basis,
+              applies_to: d.applies_to,
+              value: d.value,
+              amount: d.amount,
+              params: d.params as Prisma.InputJsonValue,
+            })),
+          });
+        }
         return tx.order.update({
           where: { id },
           data: {
@@ -284,17 +328,17 @@ export class OrdersService {
             ...(dto.location_id !== undefined
               ? { location_id: dto.location_id }
               : {}),
-            ...(dto.discount_type ? { discount_type: dto.discount_type } : {}),
-            ...(dto.special_discount_type
-              ? { special_discount_type: dto.special_discount_type }
+            ...(dto.rounding ? { rounding: dto.rounding } : {}),
+            ...(dto.rounding_precision
+              ? { rounding_precision: dec(dto.rounding_precision) }
               : {}),
             subtotal: totals.subtotal,
             discount: totals.discount,
-            special_discount: totals.special_discount,
             taxable_amount: totals.taxable_amount,
             cgst: totals.cgst,
             sgst: totals.sgst,
             igst: totals.igst,
+            round_off: totals.round_off,
             total_amount: totals.total_amount,
           },
           include: ORDER_INCLUDE,
@@ -610,7 +654,13 @@ function serialize(order: any) {
     ...order,
     subtotal: str(dec(order.subtotal?.toString())),
     discount: str(dec(order.discount?.toString())),
-    special_discount: str(dec(order.special_discount?.toString())),
+    round_off: str(dec(order.round_off?.toString())),
+    rounding_precision: str(dec(order.rounding_precision?.toString())),
+    deductions: (order.deductions ?? []).map((d: any) => ({
+      ...d,
+      value: str(dec(d.value?.toString())),
+      amount: str(dec(d.amount?.toString())),
+    })),
     taxable_amount: str(dec(order.taxable_amount?.toString())),
     cgst: str(dec(order.cgst?.toString())),
     sgst: str(dec(order.sgst?.toString())),

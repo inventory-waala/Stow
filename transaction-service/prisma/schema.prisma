@@ -31,6 +31,29 @@ enum DiscountType {
   AMOUNT
 }
 
+/// What a footer deduction's `value` means.
+enum DeductionBasis {
+  PERCENT
+  AMOUNT
+}
+
+/// What a PERCENT deduction is a percentage *of*. RUNNING cascades down the
+/// ladder — a 5% rung after a 10% rung takes 5% of the 90% that is left, which
+/// is how stacked trade terms are quoted. GROSS always uses the line subtotal.
+enum DeductionBase {
+  RUNNING
+  GROSS
+}
+
+/// How the payable total is rounded once tax is on. NORMAL is half-up, UP and
+/// DOWN always favour one side.
+enum RoundingMode {
+  NONE
+  NORMAL
+  UP
+  DOWN
+}
+
 enum CustomerStatus {
   ACTIVE
   INACTIVE
@@ -72,18 +95,22 @@ model Order {
   status      OrderStatus @default(DRAFT)
   order_date  DateTime
 
-  subtotal      Decimal      @default(0) @db.Decimal(18, 4)
-  discount_type DiscountType @default(NONE)
-  discount      Decimal      @default(0) @db.Decimal(18, 4)
-  /// A second discount applied after the bill discount, settled at review time.
-  special_discount_type DiscountType @default(NONE)
-  special_discount      Decimal      @default(0) @db.Decimal(18, 4)
-  taxable_amount        Decimal      @default(0) @db.Decimal(18, 4)
-  cgst                  Decimal      @default(0) @db.Decimal(18, 4)
-  sgst                  Decimal      @default(0) @db.Decimal(18, 4)
-  igst                  Decimal      @default(0) @db.Decimal(18, 4)
-  total_amount          Decimal      @default(0) @db.Decimal(18, 4)
-  currency              String       @default("INR")
+  subtotal Decimal @default(0) @db.Decimal(18, 4)
+  /// Sum of every row in `deductions`. Derived, kept as a column so orders can
+  /// be filtered and totalled on discount given without joining.
+  discount       Decimal @default(0) @db.Decimal(18, 4)
+  taxable_amount Decimal @default(0) @db.Decimal(18, 4)
+  cgst           Decimal @default(0) @db.Decimal(18, 4)
+  sgst           Decimal @default(0) @db.Decimal(18, 4)
+  igst           Decimal @default(0) @db.Decimal(18, 4)
+  /// Signed difference between the rounded and unrounded payable, so
+  /// `total_amount` always equals the sum of its parts.
+  round_off          Decimal      @default(0) @db.Decimal(18, 4)
+  rounding           RoundingMode @default(NONE)
+  /// The unit the total is rounded to: 1, 0.50, 0.05.
+  rounding_precision Decimal      @default(1) @db.Decimal(18, 4)
+  total_amount       Decimal      @default(0) @db.Decimal(18, 4)
+  currency           String       @default("INR")
 
   notes   String?
   remarks String?
@@ -103,8 +130,9 @@ model Order {
   updated_at DateTime  @updatedAt
   deleted_at DateTime?
 
-  customer Customer    @relation(fields: [customer_id], references: [id], onDelete: Restrict)
-  items    OrderItem[]
+  customer   Customer         @relation(fields: [customer_id], references: [id], onDelete: Restrict)
+  items      OrderItem[]
+  deductions OrderDeduction[]
 
   @@unique([tenant_id, invoice_no])
   @@index([tenant_id, status])
@@ -142,4 +170,47 @@ model OrderItem {
   @@index([order_id])
   @@index([tenant_id, size_id])
   @@map("order_items")
+}
+
+/// One rung of the invoice footer, between the line subtotal and the taxable
+/// value. An order carries as many as the deal has:
+///
+///   Subtotal                1,00,000
+///   − Wholesale discount 10%   10,000   → 90,000
+///   − Retail scheme       5%    4,500   → 85,500
+///   − Trade discount      2%    1,710   → 83,790
+///   = Taxable value            83,790
+///
+/// `code` and `label` are free text because the names are whatever the trade
+/// calls them; a new scheme is a row, never a migration. This replaces the
+/// discount + special_discount pair, which was already the same idea running
+/// out of columns.
+model OrderDeduction {
+  id        String @id @default(cuid())
+  tenant_id String
+  order_id  String
+
+  /// Position in the ladder. Order is part of the arithmetic, not cosmetic.
+  sequence   Int
+  code       String
+  label      String
+  basis      DeductionBasis
+  applies_to DeductionBase  @default(RUNNING)
+  value      Decimal        @db.Decimal(18, 4)
+  /// Resolved amount. Always computed by the service, never taken from the
+  /// request, so a stored order cannot disagree with its own footer.
+  amount     Decimal        @db.Decimal(18, 4)
+
+  /// Tenant-defined extras for rungs that are more than a flat percentage —
+  /// an eligibility threshold, a brand scope. Validated per tenant.
+  params Json @default("{}")
+
+  created_at DateTime @default(now())
+
+  order Order @relation(fields: [order_id], references: [id], onDelete: Cascade)
+
+  @@unique([order_id, sequence])
+  @@index([order_id])
+  @@index([tenant_id, code])
+  @@map("order_deductions")
 }

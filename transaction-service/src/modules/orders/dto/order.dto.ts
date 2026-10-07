@@ -12,7 +12,14 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
-import { DiscountType, OrderStatus } from '../../../../generated/prisma/client';
+import { IsJsonObject } from '../../../common/json.decorator';
+import {
+  DeductionBase,
+  DeductionBasis,
+  DiscountType,
+  OrderStatus,
+  RoundingMode,
+} from '../../../../generated/prisma/client';
 
 const POSITIVE_DECIMAL = /^\d{1,14}(\.\d{1,4})?$/;
 const RATE = /^(100(\.0{1,4})?|\d{1,2}(\.\d{1,4})?)$/;
@@ -49,6 +56,35 @@ export class OrderItemDto {
   discount?: string;
 }
 
+/**
+ * One rung of the invoice footer. `code` and `label` are free text: the names
+ * are whatever the trade calls them, and the array order is the ladder order.
+ */
+export class OrderDeductionDto {
+  @IsString()
+  @MaxLength(64)
+  code: string;
+
+  @IsString()
+  @MaxLength(120)
+  label: string;
+
+  @IsEnum(DeductionBasis)
+  basis: DeductionBasis;
+
+  @IsOptional()
+  @IsEnum(DeductionBase)
+  applies_to?: DeductionBase;
+
+  @IsNumberString()
+  @Matches(POSITIVE_DECIMAL, { message: 'value must be a positive decimal' })
+  value: string;
+
+  @IsOptional()
+  @IsJsonObject({ message: 'params must be an object' })
+  params?: Record<string, unknown>;
+}
+
 export class CreateOrderDto {
   @IsString()
   customer_id: string;
@@ -73,23 +109,26 @@ export class CreateOrderDto {
   @Type(() => OrderItemDto)
   items: OrderItemDto[];
 
+  /**
+   * The footer ladder, in the order it applies. Each rung takes its cut of
+   * what the previous one left unless it says `applies_to: GROSS`.
+   */
   @IsOptional()
-  @IsEnum(DiscountType)
-  discount_type?: DiscountType;
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => OrderDeductionDto)
+  deductions?: OrderDeductionDto[];
+
+  @IsOptional()
+  @IsEnum(RoundingMode)
+  rounding?: RoundingMode;
 
   @IsOptional()
   @IsNumberString()
-  @Matches(POSITIVE_DECIMAL)
-  discount?: string;
-
-  @IsOptional()
-  @IsEnum(DiscountType)
-  special_discount_type?: DiscountType;
-
-  @IsOptional()
-  @IsNumberString()
-  @Matches(POSITIVE_DECIMAL)
-  special_discount?: string;
+  @Matches(POSITIVE_DECIMAL, {
+    message: 'rounding_precision must be a positive decimal',
+  })
+  rounding_precision?: string;
 
   /** Tax rates as percentages; the amounts are computed from the taxable value. */
   @IsOptional()
@@ -150,23 +189,21 @@ export class UpdateOrderDto {
   @Type(() => OrderItemDto)
   items?: OrderItemDto[];
 
+  /** Replaces the whole ladder when present; omit to leave it untouched. */
   @IsOptional()
-  @IsEnum(DiscountType)
-  discount_type?: DiscountType;
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => OrderDeductionDto)
+  deductions?: OrderDeductionDto[];
+
+  @IsOptional()
+  @IsEnum(RoundingMode)
+  rounding?: RoundingMode;
 
   @IsOptional()
   @IsNumberString()
   @Matches(POSITIVE_DECIMAL)
-  discount?: string;
-
-  @IsOptional()
-  @IsEnum(DiscountType)
-  special_discount_type?: DiscountType;
-
-  @IsOptional()
-  @IsNumberString()
-  @Matches(POSITIVE_DECIMAL)
-  special_discount?: string;
+  rounding_precision?: string;
 
   @IsOptional()
   @IsNumberString()
