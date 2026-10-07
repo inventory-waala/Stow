@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useRef, useState } from "react"
 
 import { cn } from "@/lib/utils"
 import {
@@ -60,11 +60,28 @@ export function SelectField({
   "aria-label"?: string
 }) {
   const [inner, setInner] = useState<string>(defaultValue ?? "")
+  const triggerRef = useRef<HTMLButtonElement | null>(null)
   const controlled = value !== undefined
   const current = controlled ? value : inner
   // Only show a label when the value matches an option; otherwise placeholder.
   const hasOption = options.some((o) => o.value === current)
-  const items = options.map((o) => ({ value: toInner(o.value) as string, label: o.label }))
+  const items = useMemo(
+    () => options.map((o) => ({ value: toInner(o.value) as string, label: o.label })),
+    [options]
+  )
+
+  /**
+   * Put the caret back on the trigger after a choice.
+   *
+   * The popup is portalled outside whatever dialog the field sits in, so when
+   * it unmounts focus lands on document.body for an instant — long enough for
+   * the dialog's focus trap to decide focus has escaped and recover it to the
+   * first tabbable thing in the dialog. Which is somewhere near the title, not
+   * the field you were filling in. Re-asserting on the next frame runs after
+   * the trap and lands where a select is expected to leave you.
+   */
+  const keepFocus = () =>
+    requestAnimationFrame(() => triggerRef.current?.focus({ preventScroll: true }))
 
   return (
     <>
@@ -76,10 +93,16 @@ export function SelectField({
           const next = fromInner(v)
           if (!controlled) setInner(next)
           onValueChange?.(next)
+          keepFocus()
         }}
         disabled={disabled}
       >
-        <SelectTrigger id={id} aria-label={ariaLabel} className={cn("w-full", className)}>
+        <SelectTrigger
+          ref={triggerRef}
+          id={id}
+          aria-label={ariaLabel}
+          className={cn("w-full", className)}
+        >
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         {/* Drop below the trigger like a conventional select instead of
