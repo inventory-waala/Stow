@@ -108,9 +108,9 @@ export function NewPurchaseSheet({
         }
       />
       {/* The primitive's data-[side=right]:sm:max-w-sm outranks a plain
-          max-w utility, hence the `!`. A quarter of the viewport, but never
-          narrower than the 24rem it used to get on a small laptop. */}
-      <SheetContent className="w-full overflow-y-auto sm:max-w-[max(24rem,25vw)]!">
+          max-w utility, hence the `!`. Line items need the room, so this
+          takes 40% of a wide screen and never drops below 32rem. */}
+      <SheetContent className="w-full overflow-y-auto sm:max-w-[max(32rem,40vw)]!">
         <SheetHeader>
           <SheetTitle>New purchase order</SheetTitle>
           <SheetDescription>

@@ -101,7 +101,7 @@ export function NewOrderSheet({
           </Button>
         }
       />
-      <SheetContent className="w-full overflow-y-auto sm:max-w-[max(24rem,25vw)]!">
+      <SheetContent className="w-full overflow-y-auto sm:max-w-[max(32rem,40vw)]!">
         <SheetHeader>
           <SheetTitle>New order</SheetTitle>
           <SheetDescription>
