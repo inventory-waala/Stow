@@ -8,7 +8,7 @@ import { USERS_REPOSITORY } from '../../repositories/interfaces/users.repository
 import { UsersRepository } from '../../repositories/users.repository';
 
 @Module({
-  imports: [PrismaModule, TokensModule, TenantsModule],
+  imports: [PrismaModule, TokensModule],
   controllers: [UsersController],
   providers: [
     {
