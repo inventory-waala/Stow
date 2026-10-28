@@ -19,6 +19,8 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "keys:generate": "node src/scripts/generate-keys.js",
+    "permissions:check": "node src/scripts/check-permissions.js",
+    "rbac:provision": "ts-node src/scripts/provision-roles.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
     "prisma:migrate:dev": "prisma migrate dev",

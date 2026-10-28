@@ -20,6 +20,12 @@ enum UserStatus {
   SUSPENDED
 }
 
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+}
+
 model User {
   id                String          @id @default(cuid())
   name              String?
@@ -30,6 +36,7 @@ model User {
   created_at        DateTime   @default(now())
   updated_at        DateTime   @updatedAt
   authenticators    Authenticator[]
+  user_roles        UserRole[]
 
   @@index([id])
 }
@@ -54,8 +61,16 @@ model Roles {
   tenant_id   String
   name        String
   description String?
+  /// Preset roles provisioned with every tenant. They cannot be renamed or
+  /// deleted, because guards and FULL_ACCESS_ROLES match on role *name*.
+  is_system   Boolean  @default(false)
   created_at  DateTime @default(now())
   updated_at  DateTime @updatedAt
+
+  tenant      Tenant           @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  user_roles  UserRole[]
+  permissions RolePermission[]
+  invitations Invitation[]
 
   @@unique([name, tenant_id])
   @@index([tenant_id])
@@ -67,6 +82,8 @@ model Permissions {
   description String?
   created_at  DateTime @default(now())
   updated_at  DateTime @updatedAt
+
+  roles RolePermission[]
 }
 
 model RolePermission {
@@ -75,9 +92,14 @@ model RolePermission {
   created_at    DateTime @default(now())
   updated_at    DateTime @updatedAt
 
+  role       Roles       @relation(fields: [role_id], references: [id], onDelete: Cascade)
+  permission Permissions @relation(fields: [permission_id], references: [id], onDelete: Cascade)
+
   @@id([role_id, permission_id])
 }
 
+/// A row here *is* a tenant membership, as well as a role assignment. There is
+/// deliberately no separate members table (see docs/plan.md, phase 8.5).
 model UserRole {
   user_id    String
   role_id    String
@@ -85,15 +107,54 @@ model UserRole {
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
+  user   User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  role   Roles  @relation(fields: [role_id], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
   @@id([user_id, role_id, tenant_id])
+  @@index([tenant_id])
 }
 
 model Tenant {
   id          String   @id @default(cuid())
   name        String
   description String?
+  /// Bumped on every write that can change what a member's token says about
+  /// them. An access token carries the version it was signed with, so
+  /// `GET /auth/me` can tell a client its RBAC claims are stale and have it
+  /// re-mint. Guards stay free of database calls.
+  rbac_version Int     @default(0)
   created_at  DateTime @default(now())
   updated_at  DateTime @updatedAt
+
+  roles       Roles[]
+  user_roles  UserRole[]
+  invitations Invitation[]
+}
+
+/// A pending or settled invitation to join a tenant.
+///
+/// Unique on (tenant_id, email): re-inviting the same address overwrites the
+/// row with a fresh token rather than accumulating history.
+model Invitation {
+  id          String       @id @default(cuid())
+  tenant_id   String
+  email       String
+  role_id     String
+  /// sha256 of the raw token, exactly like every other token in this service.
+  token       String       @unique
+  invited_by  String
+  status      InviteStatus @default(PENDING)
+  expires_at  DateTime
+  accepted_at DateTime?
+  created_at  DateTime     @default(now())
+  updated_at  DateTime     @updatedAt
+
+  tenant Tenant @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  role   Roles  @relation(fields: [role_id], references: [id], onDelete: Cascade)
+
+  @@unique([tenant_id, email])
+  @@index([tenant_id, status])
 }
 
 model RefreshToken {

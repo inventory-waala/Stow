@@ -5,6 +5,17 @@ import {
 
 export const USERS_REPOSITORY = 'USERS_REPOSITORY';
 
+/**
+ * What a user may do inside one tenant, plus the tenant's rbac_version at the
+ * moment it was read. The version travels with the claims so a token can say
+ * which generation of the RBAC it was signed against.
+ */
+export interface TenantRbacContext {
+  roles: string[];
+  permissions: string[];
+  rbac_version: number;
+}
+
 export interface IUsersRepository {
   newUser(data: CreateUserRepositoryDto): Promise<UserProfileDto>;
   deleteUser(id: string): Promise<void>;
@@ -16,6 +27,6 @@ export interface IUsersRepository {
   findUserRolesAndPermissions(
     userId: string,
     tenantId: string,
-  ): Promise<{ roles: string[]; permissions: string[] }>;
+  ): Promise<TenantRbacContext>;
   findFirstUserRole(userId: string): Promise<{ tenant_id: string } | null>;
 }

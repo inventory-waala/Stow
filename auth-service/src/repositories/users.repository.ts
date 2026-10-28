@@ -5,7 +5,10 @@ import {
   CreateUserRepositoryDto,
   UserProfileDto,
 } from './dto/user-repository.dto';
-import { IUsersRepository } from './interfaces/users.repository.interface';
+import {
+  IUsersRepository,
+  TenantRbacContext,
+} from './interfaces/users.repository.interface';
 
 const userProfileSelect = {
   id: true,
@@ -79,40 +82,43 @@ export class UsersRepository implements IUsersRepository {
   async findUserRolesAndPermissions(
     userId: string,
     tenantId: string,
-  ): Promise<{ roles: string[]; permissions: string[] }> {
-    // Find all roles assigned to the user in this tenant
+  ): Promise<TenantRbacContext> {
+    // Read the version first: a bump that lands while the roles below are
+    // being read would otherwise produce a token stamped with the newer
+    // version but carrying the older claims -- stale, and no longer detectable.
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { rbac_version: true },
+    });
+    const rbac_version = tenant?.rbac_version ?? 0;
+
+    // One hop now that UserRole has relations: the role and its permission
+    // names come back with the membership rows.
     const userRoles = await this.prisma.userRole.findMany({
       where: { user_id: userId, tenant_id: tenantId },
+      select: {
+        role: {
+          select: {
+            name: true,
+            permissions: { select: { permission: { select: { name: true } } } },
+          },
+        },
+      },
     });
 
     if (userRoles.length === 0) {
-      return { roles: [], permissions: [] };
+      return { roles: [], permissions: [], rbac_version };
     }
 
-    const roleIds = userRoles.map((ur) => ur.role_id);
-
-    // Fetch role names
-    const roles = await this.prisma.roles.findMany({
-      where: { id: { in: roleIds } },
-      select: { name: true },
-    });
-
-    // Fetch permissions for those roles via RolePermission junction
-    const rolePermissions = await this.prisma.rolePermission.findMany({
-      where: { role_id: { in: roleIds } },
-      select: { permission_id: true },
-    });
-
-    const permissionIds = rolePermissions.map((rp) => rp.permission_id);
-
-    const permissions = await this.prisma.permissions.findMany({
-      where: { id: { in: permissionIds } },
-      select: { name: true },
-    });
+    const permissions = new Set<string>();
+    for (const { role } of userRoles) {
+      for (const rp of role.permissions) permissions.add(rp.permission.name);
+    }
 
     return {
-      roles: roles.map((r) => r.name),
-      permissions: permissions.map((p) => p.name),
+      roles: userRoles.map((ur) => ur.role.name),
+      permissions: [...permissions],
+      rbac_version,
     };
   }
 

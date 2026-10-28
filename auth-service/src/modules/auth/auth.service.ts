@@ -139,9 +139,19 @@ export class AuthService implements IAuthService {
         userData.id,
         tenantId,
       );
-      payload.tenant_id = tenantId;
-      payload.roles = rbac.roles;
-      payload.permissions = rbac.permissions;
+      // Membership *is* a user_roles row, so no roles means not a member. A
+      // token claiming a tenant with an empty permission list would read as
+      // "signed in, allowed nothing" everywhere downstream; leaving the tenant
+      // claims off instead sends the client through workspace selection.
+      if (rbac.roles.length > 0) {
+        payload.tenant_id = tenantId;
+        payload.roles = rbac.roles;
+        payload.permissions = rbac.permissions;
+        // The generation of the tenant's RBAC these claims were read from.
+        // GET /auth/me compares it against the tenant to tell a client its
+        // roles or permissions have changed under it.
+        payload.rbac_v = rbac.rbac_version;
+      }
     }
 
     return payload;
@@ -262,32 +272,26 @@ export class AuthService implements IAuthService {
     return { message: 'Password has been changed successfully' };
   }
 
+  /**
+   * Re-mints an access token in `tenantId`.
+   *
+   * Also the re-mint primitive for stale RBAC claims: the payload is read
+   * fresh from the database every time, so a client whose roles changed under
+   * it calls this with the tenant it is already in.
+   */
   async switchTenant(
     userId: string,
     tenantId: string,
   ): Promise<{ accessToken: string }> {
-    // Verify the user actually belongs to this tenant
-    const rbac = await this.usersRepository.findUserRolesAndPermissions(
-      userId,
-      tenantId,
-    );
-    if (rbac.roles.length === 0) {
-      throw new BadRequestException('User does not belong to this tenant');
-    }
-
     const user = await this.usersRepository.findById(userId);
     if (!user) throw new BadRequestException('User not found');
 
-    const payload: Record<string, any> = {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      status: user.status,
-      is_email_verified: user.is_email_verified,
-      tenant_id: tenantId,
-      roles: rbac.roles,
-      permissions: rbac.permissions,
-    };
+    const payload = await this.buildAccessPayload(user, tenantId);
+    // buildAccessPayload drops the tenant claims when the user has no role in
+    // the tenant it was asked for; switching into one has to say so instead.
+    if (payload.tenant_id !== tenantId) {
+      throw new BadRequestException('User does not belong to this tenant');
+    }
 
     return { accessToken: this.jwt.sign(payload) };
   }
