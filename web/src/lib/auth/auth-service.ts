@@ -22,6 +22,12 @@ export interface Profile {
   tenant_id: string | null
   roles: string[]
   permissions: string[]
+  /**
+   * The workspace's roles or permissions have been written since this token
+   * was signed, so `roles` and `permissions` above no longer match the
+   * database. The app shell re-mints the token when it sees this.
+   */
+  rbac_stale: boolean
 }
 
 export class AuthServiceError extends Error {

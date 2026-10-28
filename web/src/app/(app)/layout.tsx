@@ -2,6 +2,7 @@ import { redirect } from "next/navigation"
 
 import { getCurrentUser, getMyTenants } from "@/lib/auth/session"
 import { AppSidebar } from "@/components/app-sidebar"
+import { RbacRefresh } from "@/components/rbac-refresh"
 import { SiteHeader } from "@/components/site-header"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 
@@ -27,6 +28,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
         activeTenantId={user.tenant_id}
       />
       <SidebarInset className="md:shadow-ambient md:border md:border-border/60">
+        <RbacRefresh stale={user.rbac_stale} />
         <SiteHeader />
         <div id="main" className="@container/main flex min-w-0 flex-1 flex-col">
           <div className="mx-auto w-full max-w-7xl px-4 py-6 lg:px-8 lg:py-8">

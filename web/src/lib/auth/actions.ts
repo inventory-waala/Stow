@@ -152,6 +152,30 @@ export async function switchTenantAction(tenantId: string): Promise<FormState> {
   redirect("/dashboard")
 }
 
+/**
+ * Re-mints the access token in the workspace the user is already in, so RBAC
+ * changes made by someone else take effect without a sign-out.
+ *
+ * `switch-tenant` reads roles and permissions fresh from the database on every
+ * call, so switching into the current workspace *is* the re-mint.
+ */
+export async function refreshRbacAction(): Promise<void> {
+  const session = await getSession()
+  const tenantId = session?.claims.tenant_id
+  if (!session || !tenantId) return
+  try {
+    const { accessToken } = await authApi.switchTenant(
+      session.accessToken,
+      tenantId
+    )
+    await setSessionCookies({ accessToken })
+  } catch {
+    // The membership may have gone away entirely (removed from the workspace
+    // while the page was open). Swallow it: proxy.ts puts the next request on
+    // a token for a workspace they do still belong to, or at /login.
+  }
+}
+
 export async function updateTenantAction(
   _prev: FormState,
   formData: FormData
