@@ -6,7 +6,10 @@ import {
 } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { RegisterUserDto } from './dto/users-controller.dto';
-import { IUsersService } from './interfaces/users.service.interface';
+import {
+  CreateVerifiedUserDto,
+  IUsersService,
+} from './interfaces/users.service.interface';
 import {
   IUsersRepository,
   USERS_REPOSITORY,
@@ -69,7 +72,10 @@ export class UsersService implements IUsersService {
 
     // Fire-and-forget: MailService never throws, and registration must not
     // wait on SMTP round-trips.
-    void this.mailService.sendVerificationEmail(newUser.email, verificationToken);
+    void this.mailService.sendVerificationEmail(
+      newUser.email,
+      verificationToken,
+    );
 
     const { password: _password, ...safeUser } = newUser;
     return {
@@ -78,6 +84,32 @@ export class UsersService implements IUsersService {
       // be completed without a mailbox; in production it travels by email only.
       ...(process.env.NODE_ENV !== 'production' ? { verificationToken } : {}),
     };
+  }
+
+  /**
+   * Creates an account that is already verified and ACTIVE.
+   *
+   * Only for a flow where the address has already proven itself -- accepting
+   * an invitation that was emailed to it. Everything else goes through
+   * register(), which starts at PENDING_VERIFICATION and sends a link.
+   */
+  async createVerifiedUser(data: CreateVerifiedUserDto) {
+    const existingUser = await this.usersRepository.findByEmail(data.email);
+    if (existingUser) {
+      throw new ConflictException('Email is already in use');
+    }
+
+    const salt = bcrypt.genSaltSync(this.saltRounds);
+    const passwordHash = bcrypt.hashSync(data.password, salt);
+
+    const newUser = await this.usersRepository.newUser({
+      email: data.email,
+      passwordHash,
+      name: data.name,
+    });
+    await this.usersRepository.verifyUserEmail(newUser.id);
+
+    return { id: newUser.id, email: newUser.email, name: newUser.name };
   }
 
   async findByEmail(email: string) {

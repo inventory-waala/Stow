@@ -22,7 +22,14 @@ export function RbacRefresh({ stale }: { stale: boolean }) {
   const attempted = useRef(false)
 
   useEffect(() => {
-    if (!stale || attempted.current) return
+    // Armed again as soon as the claims come back fresh, so a second change
+    // later in the session is still picked up. While it stays stale the ref
+    // holds, which is what stops a change we cannot apply from looping.
+    if (!stale) {
+      attempted.current = false
+      return
+    }
+    if (attempted.current) return
     attempted.current = true
     void refreshRbacAction().then(() => router.refresh())
   }, [stale, router])

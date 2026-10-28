@@ -1,4 +1,4 @@
-import type { TeamMember } from "@/lib/team/types"
+import type { TeamMember, TeamRoleDetail } from "@/lib/team/types"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
@@ -10,6 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { EmptyRow } from "@/components/inventory/primitives"
+import { MemberActions } from "@/components/team/member-actions"
 
 /**
  * Only the statuses worth interrupting the row for. An active, verified member
@@ -66,9 +67,14 @@ function Pill({
 export function MembersTable({
   items,
   currentUserId,
+  roles,
+  canManage,
 }: {
   items: TeamMember[]
   currentUserId: string
+  /** Roles a member can be moved to; empty when the caller may not manage. */
+  roles: TeamRoleDetail[]
+  canManage: boolean
 }) {
   if (!items.length) {
     return <EmptyRow>Nobody here yet.</EmptyRow>
@@ -81,7 +87,10 @@ export function MembersTable({
           <TableRow className="hover:bg-transparent">
             <TableHead className="pl-5">Member</TableHead>
             <TableHead>Role</TableHead>
-            <TableHead className="pr-5 text-right">Joined</TableHead>
+            <TableHead className={canManage ? "text-right" : "pr-5 text-right"}>
+              Joined
+            </TableHead>
+            {canManage ? <TableHead className="pr-5" /> : null}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -131,9 +140,23 @@ export function MembersTable({
                     ))}
                   </div>
                 </TableCell>
-                <TableCell className="pr-5 text-right text-sm text-muted-foreground">
+                <TableCell
+                  className={cn(
+                    "text-right text-sm text-muted-foreground",
+                    canManage ? "" : "pr-5"
+                  )}
+                >
                   {new Date(member.joined_at).toLocaleDateString()}
                 </TableCell>
+                {canManage ? (
+                  <TableCell className="pr-5 text-right">
+                    <MemberActions
+                      member={member}
+                      roles={roles}
+                      isSelf={member.user_id === currentUserId}
+                    />
+                  </TableCell>
+                ) : null}
               </TableRow>
             )
           })}

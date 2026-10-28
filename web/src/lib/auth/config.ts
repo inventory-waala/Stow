@@ -19,5 +19,17 @@ export const AUTH_PATHS = [
   "/verify-email",
 ]
 
-/** Reachable by anyone regardless of session (marketing pages). */
-export const PUBLIC_PATHS = ["/", "/privacy", "/terms", "/security"]
+/**
+ * Reachable by anyone regardless of session: the marketing pages, plus the
+ * invitation screen. /invite has to work signed out (the invitee may have no
+ * account yet), signed in (accepting as yourself), and signed in *without* a
+ * workspace — which is why it sits here rather than in AUTH_PATHS, where a
+ * signed-in visitor would be bounced to the dashboard before reading it.
+ */
+export const PUBLIC_PATHS = [
+  "/",
+  "/privacy",
+  "/terms",
+  "/security",
+  "/invite",
+]

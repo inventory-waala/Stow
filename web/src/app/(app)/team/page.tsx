@@ -2,9 +2,11 @@ import Link from "next/link"
 import { redirect } from "next/navigation"
 
 import { getCurrentUser } from "@/lib/auth/session"
-import { getTeamMembers } from "@/lib/team/data"
+import { getTeamInvites, getTeamMembers, getTeamRoles } from "@/lib/team/data"
 import { PageHeader } from "@/components/layout/page-header"
 import { Panel, ServiceNotice } from "@/components/inventory/primitives"
+import { InviteSheet } from "@/components/team/invite-sheet"
+import { InvitesTable } from "@/components/team/invites-table"
 import { MembersTable } from "@/components/team/members-table"
 import { Button } from "@/components/ui/button"
 
@@ -38,13 +40,27 @@ export default async function TeamPage() {
     )
   }
 
-  const members = await getTeamMembers()
+  // auth-service enforces all three; withholding the controls only avoids
+  // offering actions that would come back 403.
+  const canInvite = user.permissions.includes("team.invite")
+  const canManage = user.permissions.includes("team.manage")
+
+  const [members, roles, invites] = await Promise.all([
+    getTeamMembers(),
+    canManage || canInvite ? getTeamRoles() : Promise.resolve(null),
+    canInvite ? getTeamInvites() : Promise.resolve(null),
+  ])
+
+  const roleList = roles?.ok ? roles.data : []
 
   return (
     <div className="grid gap-6 *:min-w-0">
       <PageHeader
         title="Team"
         description="Who can work in this workspace, and what they can do."
+        action={
+          canInvite && roleList.length ? <InviteSheet roles={roleList} /> : null
+        }
       />
 
       {!members.ok ? (
@@ -56,9 +72,31 @@ export default async function TeamPage() {
             members.data.length === 1 ? "person" : "people"
           } in this workspace`}
         >
-          <MembersTable items={members.data} currentUserId={user.id} />
+          <MembersTable
+            items={members.data}
+            currentUserId={user.id}
+            roles={roleList}
+            canManage={canManage}
+          />
         </Panel>
       )}
+
+      {/* Only shown to someone who can act on them; an invitation nobody can
+          resend or withdraw is just a list of email addresses. */}
+      {canInvite && invites ? (
+        invites.ok ? (
+          invites.data.length ? (
+            <Panel
+              title="Pending invitations"
+              description="Sent, not yet accepted"
+            >
+              <InvitesTable items={invites.data} canInvite={canInvite} />
+            </Panel>
+          ) : null
+        ) : (
+          <ServiceNotice message={invites.error} />
+        )
+      ) : null}
     </div>
   )
 }

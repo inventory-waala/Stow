@@ -25,6 +25,6 @@ import { EmailVerificationRepository } from '../../repositories/email-verificati
     },
   ],
   controllers: [TokensController],
-  exports: [TOKEN_SERVICE],
+  exports: [TOKEN_SERVICE, TOKENS_REPOSITORY],
 })
 export class TokensModule {}
