@@ -13,6 +13,7 @@ import { ApiKeysModule } from './modules/api-keys/api-keys.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { PasskeyModule } from './modules/passkey/passkey.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
+import { TeamModule } from './modules/team/team.module';
 import { SharedJwtModule } from './shared/shared-jwt.module';
 import { AuthGrpcModule } from './modules/auth/grpc/auth.grpc.module';
 import { MailModule } from './modules/mail/mail.module';
@@ -39,6 +40,7 @@ import { MailModule } from './modules/mail/mail.module';
     PrismaModule,
     PasskeyModule,
     TenantsModule,
+    TeamModule,
     SharedJwtModule,
     AuthGrpcModule,
     MailModule,
