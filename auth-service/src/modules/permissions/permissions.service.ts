@@ -35,7 +35,10 @@ export class PermissionsService implements OnModuleInit {
       for (const permission of PERMISSION_CATALOGUE) {
         await tx.permissions.upsert({
           where: { name: permission.name },
-          create: { name: permission.name, description: permission.description },
+          create: {
+            name: permission.name,
+            description: permission.description,
+          },
           update: { description: permission.description },
         });
       }

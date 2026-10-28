@@ -42,7 +42,9 @@ export class PasskeyController {
     const result = await this.passkeyService.verifyAuthentication(
       body.response,
     );
-    const tokens = await this.authService.loginWithVerifiedUser(result.user!.id);
+    const tokens = await this.authService.loginWithVerifiedUser(
+      result.user!.id,
+    );
     return { ...result, ...tokens };
   }
 

@@ -159,7 +159,9 @@ export class AuthController implements IAuthController {
   }
 
   @Post('verify-email')
-  async verifyEmail(@Body('token') token: string): Promise<{ message: string }> {
+  async verifyEmail(
+    @Body('token') token: string,
+  ): Promise<{ message: string }> {
     if (!token) {
       throw new BadRequestException('Token is required');
     }

@@ -52,13 +52,18 @@ async function bootstrap() {
       ),
     ]);
   } catch (err: any) {
-    const host = (process.env.DATABASE_URL || '').replace(/\/\/[^@]*@/, '//***@');
+    const host = (process.env.DATABASE_URL || '').replace(
+      /\/\/[^@]*@/,
+      '//***@',
+    );
     // Driver-adapter errors often carry the useful detail on `cause`/`code`
     // rather than `message`, which can be empty.
     const detail =
       [err?.message, err?.code, err?.cause?.message, err?.cause?.code]
         .filter(Boolean)
-        .join(' | ') || String(err) || 'no detail from driver';
+        .join(' | ') ||
+      String(err) ||
+      'no detail from driver';
     logger.error(
       `Cannot reach the database: ${detail}
 ` +

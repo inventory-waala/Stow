@@ -21,5 +21,12 @@ module.exports = {
     '@typescript-eslint/explicit-function-return-type': 'off',
     '@typescript-eslint/explicit-module-boundary-types': 'off',
     '@typescript-eslint/no-explicit-any': 'off',
+    // `const { password: _password, ...safe } = user` is how this codebase
+    // drops a field it must not return. The underscore already says "unused";
+    // the rule just needed telling.
+    '@typescript-eslint/no-unused-vars': [
+      'error',
+      { varsIgnorePattern: '^_', argsIgnorePattern: '^_' },
+    ],
   },
 };

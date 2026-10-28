@@ -194,7 +194,13 @@ export const ROLE_PRESETS: readonly RolePreset[] = [
   {
     name: 'staff',
     description: 'Works the floor: picks and packs, reads stock.',
-    permissions: ['inventory.read', 'order.read', 'order.write', 'order.fulfil', 'vendor.read'],
+    permissions: [
+      'inventory.read',
+      'order.read',
+      'order.write',
+      'order.fulfil',
+      'vendor.read',
+    ],
   },
 ] as const;
 
