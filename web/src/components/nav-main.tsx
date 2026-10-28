@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation"
 import type { LucideIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { useDismissSidebar } from "@/hooks/use-dismiss-sidebar"
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -19,6 +20,7 @@ export function NavMain({
   items: { title: string; url: string; icon: LucideIcon }[]
 }) {
   const pathname = usePathname()
+  const dismiss = useDismissSidebar()
 
   return (
     <SidebarGroup>
@@ -33,6 +35,7 @@ export function NavMain({
                   tooltip={item.title}
                   isActive={active}
                   className="h-9 rounded-lg px-2.5 transition-colors duration-200"
+                  onClick={dismiss}
                   render={<Link href={item.url} />}
                 >
                   <item.icon

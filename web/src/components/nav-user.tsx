@@ -10,6 +10,7 @@ import {
 } from "lucide-react"
 
 import { logoutAction } from "@/lib/auth/actions"
+import { useDismissSidebar } from "@/hooks/use-dismiss-sidebar"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   DropdownMenu,
@@ -44,6 +45,7 @@ function initials(name: string, email: string) {
 
 export function NavUser({ user }: { user: NavUserData }) {
   const { isMobile } = useSidebar()
+  const dismiss = useDismissSidebar()
   const [pending, startTransition] = useTransition()
   const displayName = user.name || user.email
 
@@ -94,11 +96,19 @@ export function NavUser({ user }: { user: NavUserData }) {
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem nativeButton={false} render={<Link href="/settings" />}>
+              <DropdownMenuItem
+                nativeButton={false}
+                onClick={dismiss}
+                render={<Link href="/settings" />}
+              >
                 <CircleUserRoundIcon />
                 Account
               </DropdownMenuItem>
-              <DropdownMenuItem nativeButton={false} render={<Link href="/settings/notifications" />}>
+              <DropdownMenuItem
+                nativeButton={false}
+                onClick={dismiss}
+                render={<Link href="/settings/notifications" />}
+              >
                 <BellIcon />
                 Notifications
               </DropdownMenuItem>

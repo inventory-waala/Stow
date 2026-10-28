@@ -6,6 +6,7 @@ import { CheckIcon, ChevronsUpDownIcon, PlusIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import { switchTenantAction } from "@/lib/auth/actions"
+import { useDismissSidebar } from "@/hooks/use-dismiss-sidebar"
 import type { Tenant } from "@/lib/auth/auth-service"
 import { cn } from "@/lib/utils"
 import {
@@ -54,11 +55,13 @@ export function TenantSwitcher({
   activeTenantId: string | null
 }) {
   const { isMobile } = useSidebar()
+  const dismiss = useDismissSidebar()
   const [pending, startTransition] = useTransition()
   const active = tenants.find((t) => t.id === activeTenantId)
 
   function select(tenantId: string) {
     if (tenantId === activeTenantId) return
+    dismiss()
     startTransition(async () => {
       const result = await switchTenantAction(tenantId)
       if (result?.error) toast.error(result.error)
@@ -119,6 +122,7 @@ export function TenantSwitcher({
             <DropdownMenuSeparator />
             <DropdownMenuItem
               nativeButton={false}
+              onClick={dismiss}
               render={<Link href="/workspace/new" />}
               className="gap-2.5 rounded-lg text-muted-foreground"
             >

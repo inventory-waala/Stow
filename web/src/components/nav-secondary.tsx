@@ -5,6 +5,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import type { LucideIcon } from "lucide-react"
 
+import { useDismissSidebar } from "@/hooks/use-dismiss-sidebar"
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -20,6 +21,7 @@ export function NavSecondary({
   items: { title: string; url: string; icon: LucideIcon }[]
 } & React.ComponentPropsWithoutRef<typeof SidebarGroup>) {
   const pathname = usePathname()
+  const dismiss = useDismissSidebar()
 
   return (
     <SidebarGroup {...props}>
@@ -33,6 +35,7 @@ export function NavSecondary({
                 <SidebarMenuButton
                   isActive={active}
                   className="h-9 rounded-lg px-2.5 text-muted-foreground transition-colors duration-200 data-active:text-sidebar-accent-foreground"
+                  onClick={dismiss}
                   render={external ? <a href={item.url} /> : <Link href={item.url} />}
                 >
                   <item.icon strokeWidth={1.5} />
