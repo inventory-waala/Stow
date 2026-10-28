@@ -9,6 +9,8 @@ export interface Tenant {
   id: string
   name: string
   description?: string | null
+  /** Row version: used to remount forms whose defaults came from this row. */
+  updated_at: string
 }
 
 export interface Profile {

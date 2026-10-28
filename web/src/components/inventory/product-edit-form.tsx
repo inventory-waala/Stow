@@ -23,7 +23,12 @@ export function ProductEditForm({ product }: { product: Product }) {
   )
 
   return (
-    <form action={action} className="grid gap-5 p-5 pt-0">
+    // Keyed on the row version: these fields are uncontrolled, and saving
+    // revalidates this page, so the new product arrives as a prop while the
+    // inputs are still mounted. Base UI warns when an uncontrolled default
+    // changes after initialisation; remounting initialises them from the
+    // saved product instead.
+    <form key={product.updated_at} action={action} className="grid gap-5 p-5 pt-0">
       <FormAlert state={state ?? delState} />
 
       <div className="grid gap-4 sm:grid-cols-2">

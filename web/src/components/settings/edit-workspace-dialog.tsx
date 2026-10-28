@@ -60,7 +60,15 @@ export function EditWorkspaceDialog({ tenant }: { tenant: Tenant }) {
           </DialogDescription>
         </DialogHeader>
 
-        <form action={action} className="space-y-5">
+        {/*
+          Keyed on the row version. These fields are uncontrolled, and saving
+          changes the props under them: the action revalidates, the new name
+          arrives, and the inputs are still mounted -- which Base UI warns
+          about, because a default that moves after initialisation is a
+          contradiction. Remounting the form initialises them from the saved
+          workspace instead.
+        */}
+        <form key={tenant.updated_at} action={action} className="space-y-5">
           {state?.error ? (
             <div
               role="alert"
